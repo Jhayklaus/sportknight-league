@@ -1,13 +1,13 @@
 # SportKnight League ⚔️
 
-A Next.js app for a 13-player home & away league — 156 matches across 26 matchdays,
-with one player resting each matchday.
+A Next.js app for an 18-player home & away league — 306 matches across 34
+matchdays, with every player in action each matchday.
 
 ## Features
 
 - **League table** — computed live from entered results (win 3 · draw 1 · loss 0;
   ties broken by goal difference, then goals scored, then wins).
-- **Fixtures & results** — all 26 matchdays with a completion indicator per matchday.
+- **Fixtures & results** — all 34 matchdays with a completion indicator per matchday.
   Anyone can view; only people with the secret PIN can add, edit, or clear scores.
 - **Top scorers** — players ranked by total goals scored across their matches.
 
@@ -47,8 +47,18 @@ Node host (VPS, Railway, Render, Fly.io, a Raspberry Pi…).
 
 ## Fixture data
 
-The full schedule lives in `lib/fixtures.json`. Verify its integrity
-(24 games per player, 12 home / 12 away, every pair meets home and away) with:
+The full schedule lives in `lib/fixtures.json`. Regenerate it (e.g. after
+adding or renaming players) with:
+
+```bash
+node scripts/generate-fixtures.mjs "Player A" "Player B" ...
+```
+
+This produces a balanced double round-robin: every pair meets home and away,
+and every player gets an equal number of home and away games.
+**Regenerating resets match IDs, so clear `data/scores.json` afterwards.**
+
+Verify integrity with:
 
 ```bash
 npm run validate:fixtures

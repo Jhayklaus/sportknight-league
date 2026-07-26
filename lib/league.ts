@@ -9,7 +9,7 @@ export interface Match {
 
 export interface Matchday {
   matchday: number;
-  resting: string;
+  resting: string | null;
   matches: Match[];
 }
 
@@ -39,7 +39,11 @@ export interface ScorerRow {
 }
 
 export const MATCHDAYS: Matchday[] = (
-  fixturesData as { matchday: number; resting: string; matches: { home: string; away: string }[] }[]
+  fixturesData as {
+    matchday: number;
+    resting: string | null;
+    matches: { home: string; away: string }[];
+  }[]
 ).map((md) => ({
   matchday: md.matchday,
   resting: md.resting,
