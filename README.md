@@ -1,13 +1,13 @@
 # SportKnight League ⚔️
 
-A Next.js app for an 18-player home & away league — 306 matches across 34
+A Next.js app for a 20-player home & away league — 380 matches across 38
 matchdays, with every player in action each matchday.
 
 ## Features
 
 - **League table** — computed live from entered results (win 3 · draw 1 · loss 0;
   ties broken by goal difference, then goals scored, then wins).
-- **Fixtures & results** — all 34 matchdays with a completion indicator per matchday.
+- **Fixtures & results** — all 38 matchdays with a completion indicator per matchday.
   Anyone can view; only people with the secret PIN can add, edit, or clear scores.
 - **Top scorers** — players ranked by total goals scored across their matches.
 
