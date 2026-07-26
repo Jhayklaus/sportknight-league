@@ -5,22 +5,32 @@ const matchdays = JSON.parse(
 );
 
 const errors = [];
-if (matchdays.length !== 26) errors.push(`Expected 26 matchdays, got ${matchdays.length}`);
 
 const players = new Set();
 for (const md of matchdays) {
-  players.add(md.resting);
+  if (md.resting) players.add(md.resting);
   for (const m of md.matches) { players.add(m.home); players.add(m.away); }
 }
-if (players.size !== 13) errors.push(`Expected 13 players, got ${players.size}`);
+const n = players.size;
+const odd = n % 2 === 1;
+const expectedMatchdays = odd ? 2 * n : 2 * (n - 1);
+const perMatchday = Math.floor(n / 2);
+const perPlayer = 2 * (n - 1);
+const totalExpected = n * (n - 1);
+
+if (matchdays.length !== expectedMatchdays)
+  errors.push(`Expected ${expectedMatchdays} matchdays for ${n} players, got ${matchdays.length}`);
 
 const stats = new Map([...players].map(p => [p, { games: 0, home: 0, away: 0 }]));
 const orderedPairs = new Map();
 let totalMatches = 0;
 
 for (const md of matchdays) {
-  if (md.matches.length !== 6) errors.push(`Matchday ${md.matchday}: ${md.matches.length} matches`);
-  const seen = new Set([md.resting]);
+  if (md.matches.length !== perMatchday)
+    errors.push(`Matchday ${md.matchday}: ${md.matches.length} matches (expected ${perMatchday})`);
+  if (odd && !md.resting) errors.push(`Matchday ${md.matchday}: missing resting player`);
+  if (!odd && md.resting) errors.push(`Matchday ${md.matchday}: unexpected resting player`);
+  const seen = new Set(md.resting ? [md.resting] : []);
   for (const m of md.matches) {
     totalMatches++;
     for (const [p, role] of [[m.home, "home"], [m.away, "away"]]) {
@@ -32,15 +42,16 @@ for (const md of matchdays) {
     const key = `${m.home}|${m.away}`;
     orderedPairs.set(key, (orderedPairs.get(key) ?? 0) + 1);
   }
-  if (seen.size !== 13) errors.push(`Matchday ${md.matchday}: only ${seen.size} players involved`);
+  if (seen.size !== n) errors.push(`Matchday ${md.matchday}: only ${seen.size} players involved`);
 }
 
-if (totalMatches !== 156) errors.push(`Expected 156 matches, got ${totalMatches}`);
+if (totalMatches !== totalExpected)
+  errors.push(`Expected ${totalExpected} matches, got ${totalMatches}`);
 
 for (const [p, s] of stats) {
-  if (s.games !== 24) errors.push(`${p}: ${s.games} games (expected 24)`);
-  if (s.home !== 12) errors.push(`${p}: ${s.home} home games (expected 12)`);
-  if (s.away !== 12) errors.push(`${p}: ${s.away} away games (expected 12)`);
+  if (s.games !== perPlayer) errors.push(`${p}: ${s.games} games (expected ${perPlayer})`);
+  if (s.home !== perPlayer / 2) errors.push(`${p}: ${s.home} home games (expected ${perPlayer / 2})`);
+  if (s.away !== perPlayer / 2) errors.push(`${p}: ${s.away} away games (expected ${perPlayer / 2})`);
 }
 
 for (const [key, count] of orderedPairs) {
@@ -55,4 +66,6 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`OK: ${matchdays.length} matchdays, ${totalMatches} matches, ${players.size} players — all balanced.`);
+console.log(
+  `OK: ${matchdays.length} matchdays, ${totalMatches} matches, ${n} players — all balanced (${perPlayer} games each, ${perPlayer / 2} home / ${perPlayer / 2} away).`
+);

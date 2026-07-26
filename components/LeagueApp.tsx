@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ALL_MATCHES,
   MATCHDAYS,
+  PLAYERS,
   computeTable,
   computeTopScorers,
   type Match,
@@ -69,8 +71,8 @@ export default function LeagueApp() {
           <AdminControl pin={pin} onUnlock={handleUnlock} onLock={handleLock} />
         </div>
         <p className="hero-sub">
-          13 players · home &amp; away · 156 matches — {playedCount} played,{" "}
-          {156 - playedCount} remaining
+          {PLAYERS.length} players · home &amp; away · {ALL_MATCHES.length} matches —{" "}
+          {playedCount} played, {ALL_MATCHES.length - playedCount} remaining
         </p>
         <nav className="tabs" aria-label="Sections">
           <button className={tab === "table" ? "tab active" : "tab"} onClick={() => setTab("table")}>
@@ -317,7 +319,7 @@ function Fixtures({
       <div className="card">
         <div className="md-header">
           <h2>Matchday {matchday.matchday}</h2>
-          <span className="resting">Resting: {matchday.resting}</span>
+          {matchday.resting && <span className="resting">Resting: {matchday.resting}</span>}
         </div>
         <ul className="match-list">
           {matchday.matches.map((m) => (

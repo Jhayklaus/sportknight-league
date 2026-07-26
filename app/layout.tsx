@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "SportKnight League",
   description:
-    "13-player home & away league — live table, fixtures, results and top scorers.",
+    "Home & away league — live table, fixtures, results and top scorers.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
