@@ -1,0 +1,782 @@
+[
+  {
+    "matchday": 1,
+    "resting": "Jamiu",
+    "matches": [
+      {
+        "home": "Diamonte",
+        "away": "Alexander"
+      },
+      {
+        "home": "Badmus",
+        "away": "Tonye"
+      },
+      {
+        "home": "Salomi",
+        "away": "Bolumaji David"
+      },
+      {
+        "home": "Jeremy",
+        "away": "Mimizee"
+      },
+      {
+        "home": "Ayoze",
+        "away": "Ye"
+      },
+      {
+        "home": "Bolaji",
+        "away": "Fateezy"
+      }
+    ]
+  },
+  {
+    "matchday": 2,
+    "resting": "Tonye",
+    "matches": [
+      {
+        "home": "Diamonte",
+        "away": "Jamiu"
+      },
+      {
+        "home": "Salomi",
+        "away": "Alexander"
+      },
+      {
+        "home": "Badmus",
+        "away": "Mimizee"
+      },
+      {
+        "home": "Ayoze",
+        "away": "Bolumaji David"
+      },
+      {
+        "home": "Jeremy",
+        "away": "Fateezy"
+      },
+      {
+        "home": "Bolaji",
+        "away": "Ye"
+      }
+    ]
+  },
+  {
+    "matchday": 3,
+    "resting": "Mimizee",
+    "matches": [
+      {
+        "home": "Jamiu",
+        "away": "Tonye"
+      },
+      {
+        "home": "Salomi",
+        "away": "Diamonte"
+      },
+      {
+        "home": "Ayoze",
+        "away": "Alexander"
+      },
+      {
+        "home": "Badmus",
+        "away": "Fateezy"
+      },
+      {
+        "home": "Bolaji",
+        "away": "Bolumaji David"
+      },
+      {
+        "home": "Jeremy",
+        "away": "Ye"
+      }
+    ]
+  },
+  {
+    "matchday": 4,
+    "resting": "Fateezy",
+    "matches": [
+      {
+        "home": "Salomi",
+        "away": "Jamiu"
+      },
+      {
+        "home": "Tonye",
+        "away": "Mimizee"
+      },
+      {
+        "home": "Ayoze",
+        "away": "Diamonte"
+      },
+      {
+        "home": "Bolaji",
+        "away": "Alexander"
+      },
+      {
+        "home": "Badmus",
+        "away": "Ye"
+      },
+      {
+        "home": "Jeremy",
+        "away": "Bolumaji David"
+      }
+    ]
+  },
+  {
+    "matchday": 5,
+    "resting": "Ye",
+    "matches": [
+      {
+        "home": "Jamiu",
+        "away": "Mimizee"
+      },
+      {
+        "home": "Ayoze",
+        "away": "Salomi"
+      },
+      {
+        "home": "Tonye",
+        "away": "Fateezy"
+      },
+      {
+        "home": "Bolaji",
+        "away": "Diamonte"
+      },
+      {
+        "home": "Jeremy",
+        "away": "Alexander"
+      },
+      {
+        "home": "Badmus",
+        "away": "Bolumaji David"
+      }
+    ]
+  },
+  {
+    "matchday": 6,
+    "resting": "Bolumaji David",
+    "matches": [
+      {
+        "home": "Ayoze",
+        "away": "Jamiu"
+      },
+      {
+        "home": "Mimizee",
+        "away": "Fateezy"
+      },
+      {
+        "home": "Bolaji",
+        "away": "Salomi"
+      },
+      {
+        "home": "Tonye",
+        "away": "Ye"
+      },
+      {
+        "home": "Jeremy",
+        "away": "Diamonte"
+      },
+      {
+        "home": "Badmus",
+        "away": "Alexander"
+      }
+    ]
+  },
+  {
+    "matchday": 7,
+    "resting": "Alexander",
+    "matches": [
+      {
+        "home": "Jamiu",
+        "away": "Fateezy"
+      },
+      {
+        "home": "Bolaji",
+        "away": "Ayoze"
+      },
+      {
+        "home": "Mimizee",
+        "away": "Ye"
+      },
+      {
+        "home": "Jeremy",
+        "away": "Salomi"
+      },
+      {
+        "home": "Tonye",
+        "away": "Bolumaji David"
+      },
+      {
+        "home": "Badmus",
+        "away": "Diamonte"
+      }
+    ]
+  },
+  {
+    "matchday": 8,
+    "resting": "Diamonte",
+    "matches": [
+      {
+        "home": "Bolaji",
+        "away": "Jamiu"
+      },
+      {
+        "home": "Fateezy",
+        "away": "Ye"
+      },
+      {
+        "home": "Jeremy",
+        "away": "Ayoze"
+      },
+      {
+        "home": "Mimizee",
+        "away": "Bolumaji David"
+      },
+      {
+        "home": "Badmus",
+        "away": "Salomi"
+      },
+      {
+        "home": "Tonye",
+        "away": "Alexander"
+      }
+    ]
+  },
+  {
+    "matchday": 9,
+    "resting": "Salomi",
+    "matches": [
+      {
+        "home": "Jamiu",
+        "away": "Ye"
+      },
+      {
+        "home": "Jeremy",
+        "away": "Bolaji"
+      },
+      {
+        "home": "Fateezy",
+        "away": "Bolumaji David"
+      },
+      {
+        "home": "Badmus",
+        "away": "Ayoze"
+      },
+      {
+        "home": "Mimizee",
+        "away": "Alexander"
+      },
+      {
+        "home": "Tonye",
+        "away": "Diamonte"
+      }
+    ]
+  },
+  {
+    "matchday": 10,
+    "resting": "Ayoze",
+    "matches": [
+      {
+        "home": "Jeremy",
+        "away": "Jamiu"
+      },
+      {
+        "home": "Ye",
+        "away": "Bolumaji David"
+      },
+      {
+        "home": "Badmus",
+        "away": "Bolaji"
+      },
+      {
+        "home": "Fateezy",
+        "away": "Alexander"
+      },
+      {
+        "home": "Mimizee",
+        "away": "Diamonte"
+      },
+      {
+        "home": "Tonye",
+        "away": "Salomi"
+      }
+    ]
+  },
+  {
+    "matchday": 11,
+    "resting": "Bolaji",
+    "matches": [
+      {
+        "home": "Jamiu",
+        "away": "Bolumaji David"
+      },
+      {
+        "home": "Badmus",
+        "away": "Jeremy"
+      },
+      {
+        "home": "Ye",
+        "away": "Alexander"
+      },
+      {
+        "home": "Fateezy",
+        "away": "Diamonte"
+      },
+      {
+        "home": "Tonye",
+        "away": "Ayoze"
+      },
+      {
+        "home": "Mimizee",
+        "away": "Salomi"
+      }
+    ]
+  },
+  {
+    "matchday": 12,
+    "resting": "Jeremy",
+    "matches": [
+      {
+        "home": "Badmus",
+        "away": "Jamiu"
+      },
+      {
+        "home": "Bolumaji David",
+        "away": "Alexander"
+      },
+      {
+        "home": "Ye",
+        "away": "Diamonte"
+      },
+      {
+        "home": "Tonye",
+        "away": "Bolaji"
+      },
+      {
+        "home": "Fateezy",
+        "away": "Salomi"
+      },
+      {
+        "home": "Mimizee",
+        "away": "Ayoze"
+      }
+    ]
+  },
+  {
+    "matchday": 13,
+    "resting": "Badmus",
+    "matches": [
+      {
+        "home": "Jamiu",
+        "away": "Alexander"
+      },
+      {
+        "home": "Bolumaji David",
+        "away": "Diamonte"
+      },
+      {
+        "home": "Tonye",
+        "away": "Jeremy"
+      },
+      {
+        "home": "Ye",
+        "away": "Salomi"
+      },
+      {
+        "home": "Mimizee",
+        "away": "Bolaji"
+      },
+      {
+        "home": "Fateezy",
+        "away": "Ayoze"
+      }
+    ]
+  },
+  {
+    "matchday": 14,
+    "resting": "Jamiu",
+    "matches": [
+      {
+        "home": "Alexander",
+        "away": "Diamonte"
+      },
+      {
+        "home": "Tonye",
+        "away": "Badmus"
+      },
+      {
+        "home": "Bolumaji David",
+        "away": "Salomi"
+      },
+      {
+        "home": "Mimizee",
+        "away": "Jeremy"
+      },
+      {
+        "home": "Ye",
+        "away": "Ayoze"
+      },
+      {
+        "home": "Fateezy",
+        "away": "Bolaji"
+      }
+    ]
+  },
+  {
+    "matchday": 15,
+    "resting": "Tonye",
+    "matches": [
+      {
+        "home": "Jamiu",
+        "away": "Diamonte"
+      },
+      {
+        "home": "Alexander",
+        "away": "Salomi"
+      },
+      {
+        "home": "Mimizee",
+        "away": "Badmus"
+      },
+      {
+        "home": "Bolumaji David",
+        "away": "Ayoze"
+      },
+      {
+        "home": "Fateezy",
+        "away": "Jeremy"
+      },
+      {
+        "home": "Ye",
+        "away": "Bolaji"
+      }
+    ]
+  },
+  {
+    "matchday": 16,
+    "resting": "Mimizee",
+    "matches": [
+      {
+        "home": "Tonye",
+        "away": "Jamiu"
+      },
+      {
+        "home": "Diamonte",
+        "away": "Salomi"
+      },
+      {
+        "home": "Alexander",
+        "away": "Ayoze"
+      },
+      {
+        "home": "Fateezy",
+        "away": "Badmus"
+      },
+      {
+        "home": "Bolumaji David",
+        "away": "Bolaji"
+      },
+      {
+        "home": "Ye",
+        "away": "Jeremy"
+      }
+    ]
+  },
+  {
+    "matchday": 17,
+    "resting": "Fateezy",
+    "matches": [
+      {
+        "home": "Jamiu",
+        "away": "Salomi"
+      },
+      {
+        "home": "Mimizee",
+        "away": "Tonye"
+      },
+      {
+        "home": "Diamonte",
+        "away": "Ayoze"
+      },
+      {
+        "home": "Alexander",
+        "away": "Bolaji"
+      },
+      {
+        "home": "Ye",
+        "away": "Badmus"
+      },
+      {
+        "home": "Bolumaji David",
+        "away": "Jeremy"
+      }
+    ]
+  },
+  {
+    "matchday": 18,
+    "resting": "Ye",
+    "matches": [
+      {
+        "home": "Mimizee",
+        "away": "Jamiu"
+      },
+      {
+        "home": "Salomi",
+        "away": "Ayoze"
+      },
+      {
+        "home": "Fateezy",
+        "away": "Tonye"
+      },
+      {
+        "home": "Diamonte",
+        "away": "Bolaji"
+      },
+      {
+        "home": "Alexander",
+        "away": "Jeremy"
+      },
+      {
+        "home": "Bolumaji David",
+        "away": "Badmus"
+      }
+    ]
+  },
+  {
+    "matchday": 19,
+    "resting": "Bolumaji David",
+    "matches": [
+      {
+        "home": "Jamiu",
+        "away": "Ayoze"
+      },
+      {
+        "home": "Fateezy",
+        "away": "Mimizee"
+      },
+      {
+        "home": "Salomi",
+        "away": "Bolaji"
+      },
+      {
+        "home": "Ye",
+        "away": "Tonye"
+      },
+      {
+        "home": "Diamonte",
+        "away": "Jeremy"
+      },
+      {
+        "home": "Alexander",
+        "away": "Badmus"
+      }
+    ]
+  },
+  {
+    "matchday": 20,
+    "resting": "Alexander",
+    "matches": [
+      {
+        "home": "Fateezy",
+        "away": "Jamiu"
+      },
+      {
+        "home": "Ayoze",
+        "away": "Bolaji"
+      },
+      {
+        "home": "Ye",
+        "away": "Mimizee"
+      },
+      {
+        "home": "Salomi",
+        "away": "Jeremy"
+      },
+      {
+        "home": "Bolumaji David",
+        "away": "Tonye"
+      },
+      {
+        "home": "Diamonte",
+        "away": "Badmus"
+      }
+    ]
+  },
+  {
+    "matchday": 21,
+    "resting": "Diamonte",
+    "matches": [
+      {
+        "home": "Jamiu",
+        "away": "Bolaji"
+      },
+      {
+        "home": "Ye",
+        "away": "Fateezy"
+      },
+      {
+        "home": "Ayoze",
+        "away": "Jeremy"
+      },
+      {
+        "home": "Bolumaji David",
+        "away": "Mimizee"
+      },
+      {
+        "home": "Salomi",
+        "away": "Badmus"
+      },
+      {
+        "home": "Alexander",
+        "away": "Tonye"
+      }
+    ]
+  },
+  {
+    "matchday": 22,
+    "resting": "Salomi",
+    "matches": [
+      {
+        "home": "Ye",
+        "away": "Jamiu"
+      },
+      {
+        "home": "Bolaji",
+        "away": "Jeremy"
+      },
+      {
+        "home": "Bolumaji David",
+        "away": "Fateezy"
+      },
+      {
+        "home": "Ayoze",
+        "away": "Badmus"
+      },
+      {
+        "home": "Alexander",
+        "away": "Mimizee"
+      },
+      {
+        "home": "Diamonte",
+        "away": "Tonye"
+      }
+    ]
+  },
+  {
+    "matchday": 23,
+    "resting": "Ayoze",
+    "matches": [
+      {
+        "home": "Jamiu",
+        "away": "Jeremy"
+      },
+      {
+        "home": "Bolumaji David",
+        "away": "Ye"
+      },
+      {
+        "home": "Bolaji",
+        "away": "Badmus"
+      },
+      {
+        "home": "Alexander",
+        "away": "Fateezy"
+      },
+      {
+        "home": "Diamonte",
+        "away": "Mimizee"
+      },
+      {
+        "home": "Salomi",
+        "away": "Tonye"
+      }
+    ]
+  },
+  {
+    "matchday": 24,
+    "resting": "Bolaji",
+    "matches": [
+      {
+        "home": "Bolumaji David",
+        "away": "Jamiu"
+      },
+      {
+        "home": "Jeremy",
+        "away": "Badmus"
+      },
+      {
+        "home": "Alexander",
+        "away": "Ye"
+      },
+      {
+        "home": "Diamonte",
+        "away": "Fateezy"
+      },
+      {
+        "home": "Ayoze",
+        "away": "Tonye"
+      },
+      {
+        "home": "Salomi",
+        "away": "Mimizee"
+      }
+    ]
+  },
+  {
+    "matchday": 25,
+    "resting": "Jeremy",
+    "matches": [
+      {
+        "home": "Jamiu",
+        "away": "Badmus"
+      },
+      {
+        "home": "Alexander",
+        "away": "Bolumaji David"
+      },
+      {
+        "home": "Diamonte",
+        "away": "Ye"
+      },
+      {
+        "home": "Bolaji",
+        "away": "Tonye"
+      },
+      {
+        "home": "Salomi",
+        "away": "Fateezy"
+      },
+      {
+        "home": "Ayoze",
+        "away": "Mimizee"
+      }
+    ]
+  },
+  {
+    "matchday": 26,
+    "resting": "Badmus",
+    "matches": [
+      {
+        "home": "Alexander",
+        "away": "Jamiu"
+      },
+      {
+        "home": "Diamonte",
+        "away": "Bolumaji David"
+      },
+      {
+        "home": "Jeremy",
+        "away": "Tonye"
+      },
+      {
+        "home": "Salomi",
+        "away": "Ye"
+      },
+      {
+        "home": "Bolaji",
+        "away": "Mimizee"
+      },
+      {
+        "home": "Ayoze",
+        "away": "Fateezy"
+      }
+    ]
+  }
+]
