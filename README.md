@@ -32,18 +32,30 @@ session; the PIN is verified server-side on every save.
 | Variable          | Default  | Purpose                                        |
 | ----------------- | -------- | ---------------------------------------------- |
 | `LEAGUE_PIN`      | `1234`   | Secret PIN required to update scores. **Change it.** |
-| `LEAGUE_DATA_DIR` | `./data` | Where `scores.json` (the results store) lives. |
+| `LEAGUE_DATA_DIR` | `./data` | Where `scores.json` lives (file backend only). |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | — | Redis REST credentials (Vercel KV naming). |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | — | Redis REST credentials (Upstash naming). |
 
 ## How results are stored
 
-Results are kept in a single JSON file (`data/scores.json`), written atomically
-on every update. This is simple and dependable for a friends league on any
-Node host (VPS, Railway, Render, Fly.io, a Raspberry Pi…).
+`lib/store.ts` picks a backend automatically:
 
-> **Note for serverless hosts (e.g. Vercel):** the filesystem there is
-> ephemeral, so entered scores would vanish on redeploy. Deploy to a host with a
-> persistent disk, or swap `lib/store.ts` for a hosted store (Vercel KV, Upstash,
-> Supabase) — it is the only file that touches storage.
+- **Redis over REST** (Upstash / Vercel KV) whenever its env vars are set —
+  results survive redeploys and work on serverless hosts.
+- **A local JSON file** (`data/scores.json`, atomic writes) otherwise — fine
+  for local dev or any host with a persistent disk (VPS, Railway, Fly.io…).
+
+### Deploying on Vercel
+
+Vercel's serverless filesystem is **read-only**, so the file backend cannot
+save scores there (`POST /api/scores` returns 500). Set up the Redis backend:
+
+1. In your Vercel project, open **Storage → Create Database → Upstash for
+   Redis** (free tier is plenty) and connect it to the project. This adds the
+   `KV_REST_API_URL`/`KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_*`) env vars.
+2. While you're in **Settings → Environment Variables**, also set `LEAGUE_PIN`
+   to your real secret — otherwise the default `1234` is live.
+3. Redeploy. Score updates now persist in Redis.
 
 ## Fixture data
 
