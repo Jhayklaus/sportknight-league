@@ -16,7 +16,7 @@
         "away": "Fateezy"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Ye"
       },
       {
@@ -62,7 +62,7 @@
         "away": "Fateezy"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Glizzy"
       },
       {
@@ -108,7 +108,7 @@
         "away": "Fateezy"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Captain Ben"
       },
       {
@@ -154,7 +154,7 @@
         "away": "Fateezy"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Tonye"
       },
       {
@@ -200,7 +200,7 @@
         "away": "Fateezy"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Osama bin Laden"
       },
       {
@@ -246,7 +246,7 @@
         "away": "Fateezy"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Variff"
       }
     ]
@@ -288,7 +288,7 @@
         "away": "Variff"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Fateezy"
       }
     ]
@@ -326,7 +326,7 @@
         "away": "Variff"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Jamiu"
       },
       {
@@ -364,7 +364,7 @@
         "away": "Variff"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Salo"
       },
       {
@@ -402,7 +402,7 @@
         "away": "Variff"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Hendrixx"
       },
       {
@@ -440,7 +440,7 @@
         "away": "Variff"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Bigflix"
       },
       {
@@ -478,7 +478,7 @@
         "away": "Variff"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Emmax"
       },
       {
@@ -516,7 +516,7 @@
         "away": "Variff"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Jeremy"
       },
       {
@@ -554,7 +554,7 @@
         "away": "Diamonte"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Irresponsible"
       },
       {
@@ -593,7 +593,7 @@
     "matches": [
       {
         "home": "Diamonte",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Variff",
@@ -639,7 +639,7 @@
       },
       {
         "home": "Jero",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Variff",
@@ -685,7 +685,7 @@
       },
       {
         "home": "Mimi",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Variff",
@@ -731,7 +731,7 @@
       },
       {
         "home": "Ye",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Variff",
@@ -777,7 +777,7 @@
       },
       {
         "home": "Glizzy",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Variff",
@@ -823,7 +823,7 @@
       },
       {
         "home": "Captain Ben",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Variff",
@@ -869,7 +869,7 @@
       },
       {
         "home": "Tonye",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Variff",
@@ -915,7 +915,7 @@
       },
       {
         "home": "Osama bin Laden",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Variff",
@@ -961,7 +961,7 @@
       },
       {
         "home": "Variff",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       }
     ]
   },
@@ -1003,7 +1003,7 @@
       },
       {
         "home": "Fateezy",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       }
     ]
   },
@@ -1041,7 +1041,7 @@
       },
       {
         "home": "Jamiu",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Fateezy",
@@ -1079,7 +1079,7 @@
       },
       {
         "home": "Salo",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Fateezy",
@@ -1117,7 +1117,7 @@
       },
       {
         "home": "Hendrixx",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Fateezy",
@@ -1155,7 +1155,7 @@
       },
       {
         "home": "Bigflix",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Fateezy",
@@ -1193,7 +1193,7 @@
       },
       {
         "home": "Emmax",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Fateezy",
@@ -1231,7 +1231,7 @@
       },
       {
         "home": "Jeremy",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Fateezy",
@@ -1269,7 +1269,7 @@
       },
       {
         "home": "Irresponsible",
-        "away": "Shoot alpha"
+        "away": "Alexander"
       },
       {
         "home": "Fateezy",
@@ -1306,7 +1306,7 @@
     "resting": null,
     "matches": [
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Diamonte"
       },
       {
@@ -1352,7 +1352,7 @@
         "away": "Fateezy"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Jero"
       },
       {
@@ -1398,7 +1398,7 @@
         "away": "Fateezy"
       },
       {
-        "home": "Shoot alpha",
+        "home": "Alexander",
         "away": "Mimi"
       },
       {
