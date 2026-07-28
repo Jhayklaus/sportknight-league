@@ -6,7 +6,12 @@ import { checkPin } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return NextResponse.json({ scores: readScores() });
+  try {
+    return NextResponse.json({ scores: await readScores() });
+  } catch (err) {
+    console.error("Failed to read scores:", err);
+    return NextResponse.json({ scores: {}, warning: "storage unavailable" });
+  }
 }
 
 export async function POST(request: Request) {
@@ -32,19 +37,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unknown match" }, { status: 400 });
   }
 
-  // home/away both null clears the result; otherwise both must be integers 0–99.
-  if (home === null && away === null) {
-    const scores = writeScore(matchId, null);
-    return NextResponse.json({ scores });
-  }
-
-  if (!isValidScore(home) || !isValidScore(away)) {
+  try {
+    // home/away both null clears the result; otherwise both must be integers 0–99.
+    if (home === null && away === null) {
+      return NextResponse.json({ scores: await writeScore(matchId, null) });
+    }
+    if (!isValidScore(home) || !isValidScore(away)) {
+      return NextResponse.json(
+        { error: "Scores must be whole numbers between 0 and 99" },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json({ scores: await writeScore(matchId, { home, away }) });
+  } catch (err) {
+    console.error("Failed to write score:", err);
     return NextResponse.json(
-      { error: "Scores must be whole numbers between 0 and 99" },
-      { status: 400 }
+      {
+        error:
+          "Could not save: storage is not configured. On Vercel, connect the Upstash Redis integration (see README) and redeploy.",
+      },
+      { status: 500 }
     );
   }
-
-  const scores = writeScore(matchId, { home, away });
-  return NextResponse.json({ scores });
 }
