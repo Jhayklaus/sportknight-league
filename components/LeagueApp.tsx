@@ -16,8 +16,9 @@ import {
   type Score,
   type Scores,
 } from "@/lib/league";
+import { HeadToHeadTab, PlayersTab } from "./PlayerViews";
 
-type Tab = "table" | "fixtures" | "scorers" | "cleansheets";
+type Tab = "table" | "fixtures" | "scorers" | "cleansheets" | "players" | "h2h";
 
 const PIN_STORAGE_KEY = "sportknight-pin";
 
@@ -27,6 +28,7 @@ export default function LeagueApp() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pin, setPin] = useState<string | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
 
   const { scores, deductions } = state;
 
@@ -72,6 +74,11 @@ export default function LeagueApp() {
     sessionStorage.removeItem(PIN_STORAGE_KEY);
   }, []);
 
+  const openProfile = useCallback((player: string) => {
+    setSelectedPlayer(player);
+    setTab("players");
+  }, []);
+
   return (
     <main className="shell">
       <header className="hero">
@@ -108,6 +115,15 @@ export default function LeagueApp() {
           >
             Clean Sheets
           </button>
+          <button
+            className={tab === "players" ? "tab active" : "tab"}
+            onClick={() => setTab("players")}
+          >
+            Players
+          </button>
+          <button className={tab === "h2h" ? "tab active" : "tab"} onClick={() => setTab("h2h")}>
+            Head to Head
+          </button>
         </nav>
       </header>
 
@@ -118,7 +134,7 @@ export default function LeagueApp() {
         <>
           {tab === "table" && (
             <>
-              <LeagueTable rows={table} />
+              <LeagueTable rows={table} onSelectPlayer={openProfile} />
               <DeductionsPanel
                 deductions={deductions}
                 pin={pin}
@@ -137,6 +153,15 @@ export default function LeagueApp() {
           )}
           {tab === "scorers" && <TopScorers rows={scorers} />}
           {tab === "cleansheets" && <CleanSheets rows={cleanSheets} />}
+          {tab === "players" && (
+            <PlayersTab
+              scores={scores}
+              deductions={deductions}
+              selected={selectedPlayer}
+              onSelect={setSelectedPlayer}
+            />
+          )}
+          {tab === "h2h" && <HeadToHeadTab scores={scores} />}
         </>
       )}
 
@@ -251,7 +276,13 @@ function FormPips({ form }: { form: FormEntry[] }) {
   );
 }
 
-function LeagueTable({ rows }: { rows: ReturnType<typeof computeTable> }) {
+function LeagueTable({
+  rows,
+  onSelectPlayer,
+}: {
+  rows: ReturnType<typeof computeTable>;
+  onSelectPlayer: (player: string) => void;
+}) {
   return (
     <section className="card">
       <div className="table-scroll">
@@ -277,7 +308,9 @@ function LeagueTable({ rows }: { rows: ReturnType<typeof computeTable> }) {
               <tr key={row.player} className={i === 0 ? "leader" : i < 4 ? "top-four" : ""}>
                 <td className="num pos">{i + 1}</td>
                 <td className="name">
-                  {row.player}
+                  <button className="linkish" onClick={() => onSelectPlayer(row.player)}>
+                    {row.player}
+                  </button>
                   {row.deducted > 0 && (
                     <span className="ded-badge" title={`${row.deducted} points deducted`}>
                       −{row.deducted}
@@ -302,7 +335,8 @@ function LeagueTable({ rows }: { rows: ReturnType<typeof computeTable> }) {
         </table>
       </div>
       <p className="table-legend">
-        CS = clean sheets · Form = last {FORM_LENGTH} games (newest last) · hover a pip for the result
+        CS = clean sheets · Form = last {FORM_LENGTH} games (newest last) · hover a pip for the
+        result · tap a name for their profile
       </p>
     </section>
   );
