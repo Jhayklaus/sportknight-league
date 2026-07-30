@@ -3,48 +3,59 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ALL_MATCHES,
+  FORM_LENGTH,
   MATCHDAYS,
   PLAYERS,
+  computeCleanSheets,
   computeTable,
   computeTopScorers,
+  type Deduction,
+  type FormEntry,
+  type LeagueState,
   type Match,
+  type Score,
   type Scores,
 } from "@/lib/league";
 
-type Tab = "table" | "fixtures" | "scorers";
+type Tab = "table" | "fixtures" | "scorers" | "cleansheets";
 
 const PIN_STORAGE_KEY = "sportknight-pin";
 
 export default function LeagueApp() {
   const [tab, setTab] = useState<Tab>("table");
-  const [scores, setScores] = useState<Scores>({});
+  const [state, setState] = useState<LeagueState>({ scores: {}, deductions: [] });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pin, setPin] = useState<string | null>(null);
 
-  const loadScores = useCallback(async () => {
+  const { scores, deductions } = state;
+
+  const loadState = useCallback(async () => {
     try {
       const res = await fetch("/api/scores", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as { scores: Scores };
-      setScores(data.scores ?? {});
+      const data = (await res.json()) as LeagueState;
+      setState({ scores: data.scores ?? {}, deductions: data.deductions ?? [] });
       setLoadError(null);
     } catch {
-      setLoadError("Could not load results. Pull to refresh or try again.");
+      setLoadError("Could not load results. Refresh to try again.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadScores();
+    loadState();
     const saved = sessionStorage.getItem(PIN_STORAGE_KEY);
     if (saved) setPin(saved);
-  }, [loadScores]);
+  }, [loadState]);
 
-  const table = useMemo(() => computeTable(scores), [scores]);
+  const table = useMemo(() => computeTable(scores, deductions), [scores, deductions]);
   const scorers = useMemo(() => computeTopScorers(scores), [scores]);
-  const playedCount = Object.keys(scores).length;
+  const cleanSheets = useMemo(() => computeCleanSheets(scores), [scores]);
+
+  const playedCount = Object.values(scores).filter((s) => !s.noShow).length;
+  const noShowCount = Object.values(scores).filter((s) => s.noShow).length;
 
   const handleUnlock = (nextPin: string) => {
     setPin(nextPin);
@@ -72,7 +83,8 @@ export default function LeagueApp() {
         </div>
         <p className="hero-sub">
           {PLAYERS.length} players · home &amp; away · {ALL_MATCHES.length} matches —{" "}
-          {playedCount} played, {ALL_MATCHES.length - playedCount} remaining
+          {playedCount} played, {ALL_MATCHES.length - playedCount - noShowCount} remaining
+          {noShowCount > 0 && ` · ${noShowCount} no-show`}
         </p>
         <nav className="tabs" aria-label="Sections">
           <button className={tab === "table" ? "tab active" : "tab"} onClick={() => setTab("table")}>
@@ -90,6 +102,12 @@ export default function LeagueApp() {
           >
             Top Scorers
           </button>
+          <button
+            className={tab === "cleansheets" ? "tab active" : "tab"}
+            onClick={() => setTab("cleansheets")}
+          >
+            Clean Sheets
+          </button>
         </nav>
       </header>
 
@@ -98,21 +116,33 @@ export default function LeagueApp() {
         <p className="banner">Loading league data…</p>
       ) : (
         <>
-          {tab === "table" && <LeagueTable rows={table} />}
+          {tab === "table" && (
+            <>
+              <LeagueTable rows={table} />
+              <DeductionsPanel
+                deductions={deductions}
+                pin={pin}
+                onStateUpdated={setState}
+                onPinRejected={handlePinRejected}
+              />
+            </>
+          )}
           {tab === "fixtures" && (
             <Fixtures
               scores={scores}
               pin={pin}
-              onScoresUpdated={setScores}
+              onStateUpdated={setState}
               onPinRejected={handlePinRejected}
             />
           )}
           {tab === "scorers" && <TopScorers rows={scorers} />}
+          {tab === "cleansheets" && <CleanSheets rows={cleanSheets} />}
         </>
       )}
 
       <footer className="footer">
-        Points: win 3 · draw 1 · loss 0. Ties broken by goal difference, then goals scored.
+        Points: win 3 · draw 1 · loss 0. Ties broken by goal difference, goals scored, then wins.
+        No-show fixtures are void — no points, no stats for either player.
       </footer>
     </main>
   );
@@ -204,6 +234,23 @@ function AdminControl({
   );
 }
 
+function FormPips({ form }: { form: FormEntry[] }) {
+  if (form.length === 0) return <span className="form-empty">—</span>;
+  return (
+    <span className="form-pips">
+      {form.map((entry, i) => (
+        <span
+          key={`${entry.matchday}-${i}`}
+          className={`pip pip-${entry.result}`}
+          title={`MD${entry.matchday} ${entry.home ? "vs" : "at"} ${entry.opponent} — ${entry.scoreFor}–${entry.scoreAgainst}`}
+        >
+          {entry.result}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function LeagueTable({ rows }: { rows: ReturnType<typeof computeTable> }) {
   return (
     <section className="card">
@@ -220,14 +267,23 @@ function LeagueTable({ rows }: { rows: ReturnType<typeof computeTable> }) {
               <th className="num">GF</th>
               <th className="num">GA</th>
               <th className="num">GD</th>
+              <th className="num">CS</th>
               <th className="num pts">Pts</th>
+              <th className="form-col">Form</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, i) => (
               <tr key={row.player} className={i === 0 ? "leader" : i < 4 ? "top-four" : ""}>
                 <td className="num pos">{i + 1}</td>
-                <td className="name">{row.player}</td>
+                <td className="name">
+                  {row.player}
+                  {row.deducted > 0 && (
+                    <span className="ded-badge" title={`${row.deducted} points deducted`}>
+                      −{row.deducted}
+                    </span>
+                  )}
+                </td>
                 <td className="num">{row.played}</td>
                 <td className="num">{row.won}</td>
                 <td className="num">{row.drawn}</td>
@@ -235,12 +291,129 @@ function LeagueTable({ rows }: { rows: ReturnType<typeof computeTable> }) {
                 <td className="num">{row.goalsFor}</td>
                 <td className="num">{row.goalsAgainst}</td>
                 <td className="num">{row.goalDiff > 0 ? `+${row.goalDiff}` : row.goalDiff}</td>
+                <td className="num">{row.cleanSheets}</td>
                 <td className="num pts">{row.points}</td>
+                <td className="form-col">
+                  <FormPips form={row.form} />
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      <p className="table-legend">
+        CS = clean sheets · Form = last {FORM_LENGTH} games (newest last) · hover a pip for the result
+      </p>
+    </section>
+  );
+}
+
+function DeductionsPanel({
+  deductions,
+  pin,
+  onStateUpdated,
+  onPinRejected,
+}: {
+  deductions: Deduction[];
+  pin: string | null;
+  onStateUpdated: (state: LeagueState) => void;
+  onPinRejected: () => void;
+}) {
+  const [player, setPlayer] = useState(PLAYERS[0]);
+  const [points, setPoints] = useState("3");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const send = async (payload: Record<string, unknown>) => {
+    if (busy || !pin) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/deductions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin, ...payload }),
+      });
+      const data = await res.json();
+      if (res.status === 401) {
+        setError("PIN no longer valid — unlock again");
+        onPinRejected();
+        return;
+      }
+      if (!res.ok) {
+        setError(data.error ?? "Save failed");
+        return;
+      }
+      onStateUpdated(data as LeagueState);
+      setReason("");
+    } catch {
+      setError("Network error — try again");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!pin && deductions.length === 0) return null;
+
+  return (
+    <section className="card deductions">
+      <h3>Point deductions</h3>
+      {deductions.length === 0 ? (
+        <p className="muted">No deductions yet.</p>
+      ) : (
+        <ul className="ded-list">
+          {deductions.map((d) => (
+            <li key={d.id}>
+              <span className="ded-player">{d.player}</span>
+              <span className="ded-points">−{d.points} pts</span>
+              <span className="ded-reason">{d.reason || "no reason given"}</span>
+              {pin && (
+                <button className="mini danger" onClick={() => send({ id: d.id })} disabled={busy}>
+                  Undo
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {pin && (
+        <form
+          className="ded-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            send({ player, points: Number(points), reason });
+          }}
+        >
+          <select value={player} onChange={(e) => setPlayer(e.target.value)} aria-label="Player">
+            {PLAYERS.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min={1}
+            max={99}
+            value={points}
+            onChange={(e) => setPoints(e.target.value)}
+            aria-label="Points to deduct"
+          />
+          <input
+            type="text"
+            placeholder="Reason (e.g. 3rd network cut while losing)"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            aria-label="Reason"
+          />
+          <button type="submit" className="mini save" disabled={busy}>
+            {busy ? "…" : "Deduct"}
+          </button>
+        </form>
+      )}
+      {error && <p className="row-error">{error}</p>}
     </section>
   );
 }
@@ -272,15 +445,45 @@ function TopScorers({ rows }: { rows: ReturnType<typeof computeTopScorers> }) {
   );
 }
 
+function CleanSheets({ rows }: { rows: ReturnType<typeof computeCleanSheets> }) {
+  const max = Math.max(1, ...rows.map((r) => r.cleanSheets));
+  return (
+    <section className="card">
+      <ol className="scorers">
+        {rows.map((row, i) => (
+          <li key={row.player} className="scorer-row">
+            <span className={`scorer-rank rank-${i + 1}`}>{i + 1}</span>
+            <div className="scorer-main">
+              <div className="scorer-head">
+                <span className="scorer-name">{row.player}</span>
+                <span className="scorer-goals cs">
+                  {row.cleanSheets} 🧤
+                  <span className="scorer-played">
+                    {" "}
+                    · {row.played} played · {row.goalsAgainst} conceded
+                  </span>
+                </span>
+              </div>
+              <div className="bar-track">
+                <div className="bar-fill cs" style={{ width: `${(row.cleanSheets / max) * 100}%` }} />
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function Fixtures({
   scores,
   pin,
-  onScoresUpdated,
+  onStateUpdated,
   onPinRejected,
 }: {
   scores: Scores;
   pin: string | null;
-  onScoresUpdated: (scores: Scores) => void;
+  onStateUpdated: (state: LeagueState) => void;
   onPinRejected: () => void;
 }) {
   const firstUnfinished = useMemo(() => {
@@ -328,7 +531,7 @@ function Fixtures({
               match={m}
               score={scores[m.id]}
               pin={pin}
-              onScoresUpdated={onScoresUpdated}
+              onStateUpdated={onStateUpdated}
               onPinRejected={onPinRejected}
             />
           ))}
@@ -342,13 +545,13 @@ function MatchRow({
   match,
   score,
   pin,
-  onScoresUpdated,
+  onStateUpdated,
   onPinRejected,
 }: {
   match: Match;
-  score?: { home: number; away: number };
+  score?: Score;
   pin: string | null;
-  onScoresUpdated: (scores: Scores) => void;
+  onStateUpdated: (state: LeagueState) => void;
   onPinRejected: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -358,27 +561,21 @@ function MatchRow({
   const [error, setError] = useState<string | null>(null);
 
   const startEdit = () => {
-    setHomeVal(score ? String(score.home) : "");
-    setAwayVal(score ? String(score.away) : "");
+    setHomeVal(score && !score.noShow ? String(score.home) : "");
+    setAwayVal(score && !score.noShow ? String(score.away) : "");
     setError(null);
     setEditing(true);
   };
 
-  const save = async (clear = false) => {
+  const send = async (payload: Record<string, unknown>) => {
     if (busy || !pin) return;
-    const home = clear ? null : Number(homeVal);
-    const away = clear ? null : Number(awayVal);
-    if (!clear && (homeVal.trim() === "" || awayVal.trim() === "" || Number.isNaN(home) || Number.isNaN(away))) {
-      setError("Enter both scores");
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
       const res = await fetch("/api/scores", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin, matchId: match.id, home, away }),
+        body: JSON.stringify({ pin, matchId: match.id, ...payload }),
       });
       const data = await res.json();
       if (res.status === 401) {
@@ -390,7 +587,7 @@ function MatchRow({
         setError(data.error ?? "Save failed");
         return;
       }
-      onScoresUpdated(data.scores as Scores);
+      onStateUpdated(data as LeagueState);
       setEditing(false);
     } catch {
       setError("Network error — try again");
@@ -399,8 +596,22 @@ function MatchRow({
     }
   };
 
+  const saveScore = () => {
+    if (homeVal.trim() === "" || awayVal.trim() === "") {
+      setError("Enter both scores");
+      return;
+    }
+    send({ home: Number(homeVal), away: Number(awayVal) });
+  };
+
+  const display = score
+    ? score.noShow
+      ? "No show"
+      : `${score.home} – ${score.away}`
+    : "vs";
+
   return (
-    <li className={score ? "match played" : "match"}>
+    <li className={score ? (score.noShow ? "match noshow" : "match played") : "match"}>
       <span className="side home">{match.home}</span>
       {editing && pin ? (
         <span className="score-edit">
@@ -425,8 +636,8 @@ function MatchRow({
           />
         </span>
       ) : (
-        <span className={score ? "score" : "score empty"}>
-          {score ? `${score.home} – ${score.away}` : "vs"}
+        <span className={score ? (score.noShow ? "score ns" : "score") : "score empty"}>
+          {display}
         </span>
       )}
       <span className="side away">{match.away}</span>
@@ -435,8 +646,16 @@ function MatchRow({
         <span className="row-actions">
           {editing ? (
             <>
-              <button className="mini save" onClick={() => save()} disabled={busy}>
+              <button className="mini save" onClick={saveScore} disabled={busy}>
                 {busy ? "…" : "Save"}
+              </button>
+              <button
+                className="mini"
+                onClick={() => send({ noShow: true })}
+                disabled={busy}
+                title="Neither player showed up — 0–0, no points for either (Rule 5)"
+              >
+                No show
               </button>
               <button className="mini ghost" onClick={() => setEditing(false)} disabled={busy}>
                 Cancel
@@ -444,7 +663,7 @@ function MatchRow({
               {score && (
                 <button
                   className="mini danger"
-                  onClick={() => save(true)}
+                  onClick={() => send({ home: null, away: null })}
                   disabled={busy}
                   title="Remove this result"
                 >
