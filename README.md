@@ -9,7 +9,16 @@ matchdays, with every player in action each matchday.
   ties broken by goal difference, then goals scored, then wins).
 - **Fixtures & results** — all 34 matchdays with a completion indicator per matchday.
   Anyone can view; only people with the secret PIN can add, edit, or clear scores.
-- **Top scorers** — players ranked by total goals scored across their matches.
+- **Top scorers** and **clean sheets** — players ranked by goals and by shutouts.
+- **Player profiles** — position, form, home/away split, biggest win/loss, full
+  results and remaining fixtures. Names in the table link straight to them.
+- **Head to head** — both meetings between any two players, with aggregate record.
+- **Deadline tracker** — rule 5's 48-hour, three-matchday window: countdown plus
+  exactly who still owes games, so recorders know who to chase.
+- **What if** — project the table by picking imagined winners for unplayed
+  fixtures (nothing is saved).
+- **Activity feed** — the most recently recorded results, newest first.
+- **Export & backup** — download the season as JSON or CSV, and restore a backup.
 
 Scores update the table and scorer rankings instantly.
 
@@ -31,7 +40,7 @@ session; the PIN is verified server-side on every save.
 
 | Variable          | Default  | Purpose                                        |
 | ----------------- | -------- | ---------------------------------------------- |
-| `LEAGUE_PIN`      | `1234`   | Secret PIN required to update scores. **Change it.** |
+| `LEAGUE_PIN`      | `1234`   | Secret PIN required to update scores, deductions, deadlines and restores. **Change it.** |
 | `LEAGUE_DATA_DIR` | `./data` | Where `scores.json` lives (file backend only). |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | — | Redis REST credentials (Vercel KV naming). |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | — | Redis REST credentials (Upstash naming). |

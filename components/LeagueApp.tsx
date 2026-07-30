@@ -16,26 +16,44 @@ import {
   type Score,
   type Scores,
 } from "@/lib/league";
+import { HeadToHeadTab, PlayersTab } from "./PlayerViews";
+import { ActivityTab, BackupTab, DeadlineTab, WhatIfTab } from "./LeagueTools";
 
-type Tab = "table" | "fixtures" | "scorers" | "cleansheets";
+type Tab =
+  | "table"
+  | "fixtures"
+  | "scorers"
+  | "cleansheets"
+  | "players"
+  | "h2h"
+  | "deadline"
+  | "whatif"
+  | "activity"
+  | "backup";
 
 const PIN_STORAGE_KEY = "sportknight-pin";
 
 export default function LeagueApp() {
   const [tab, setTab] = useState<Tab>("table");
-  const [state, setState] = useState<LeagueState>({ scores: {}, deductions: [] });
+  const [state, setState] = useState<LeagueState>({ scores: {}, deductions: [], window: null });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pin, setPin] = useState<string | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
 
   const { scores, deductions } = state;
+  const leagueWindow = state.window;
 
   const loadState = useCallback(async () => {
     try {
       const res = await fetch("/api/scores", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as LeagueState;
-      setState({ scores: data.scores ?? {}, deductions: data.deductions ?? [] });
+      setState({
+        scores: data.scores ?? {},
+        deductions: data.deductions ?? [],
+        window: data.window ?? null,
+      });
       setLoadError(null);
     } catch {
       setLoadError("Could not load results. Refresh to try again.");
@@ -70,6 +88,11 @@ export default function LeagueApp() {
   const handlePinRejected = useCallback(() => {
     setPin(null);
     sessionStorage.removeItem(PIN_STORAGE_KEY);
+  }, []);
+
+  const openProfile = useCallback((player: string) => {
+    setSelectedPlayer(player);
+    setTab("players");
   }, []);
 
   return (
@@ -108,6 +131,39 @@ export default function LeagueApp() {
           >
             Clean Sheets
           </button>
+          <button
+            className={tab === "players" ? "tab active" : "tab"}
+            onClick={() => setTab("players")}
+          >
+            Players
+          </button>
+          <button className={tab === "h2h" ? "tab active" : "tab"} onClick={() => setTab("h2h")}>
+            Head to Head
+          </button>
+          <button
+            className={tab === "deadline" ? "tab active" : "tab"}
+            onClick={() => setTab("deadline")}
+          >
+            Deadline
+          </button>
+          <button
+            className={tab === "whatif" ? "tab active" : "tab"}
+            onClick={() => setTab("whatif")}
+          >
+            What If
+          </button>
+          <button
+            className={tab === "activity" ? "tab active" : "tab"}
+            onClick={() => setTab("activity")}
+          >
+            Activity
+          </button>
+          <button
+            className={tab === "backup" ? "tab active" : "tab"}
+            onClick={() => setTab("backup")}
+          >
+            Backup
+          </button>
         </nav>
       </header>
 
@@ -118,7 +174,7 @@ export default function LeagueApp() {
         <>
           {tab === "table" && (
             <>
-              <LeagueTable rows={table} />
+              <LeagueTable rows={table} onSelectPlayer={openProfile} />
               <DeductionsPanel
                 deductions={deductions}
                 pin={pin}
@@ -137,6 +193,34 @@ export default function LeagueApp() {
           )}
           {tab === "scorers" && <TopScorers rows={scorers} />}
           {tab === "cleansheets" && <CleanSheets rows={cleanSheets} />}
+          {tab === "players" && (
+            <PlayersTab
+              scores={scores}
+              deductions={deductions}
+              selected={selectedPlayer}
+              onSelect={setSelectedPlayer}
+            />
+          )}
+          {tab === "h2h" && <HeadToHeadTab scores={scores} />}
+          {tab === "deadline" && (
+            <DeadlineTab
+              scores={scores}
+              window={leagueWindow}
+              pin={pin}
+              onStateUpdated={setState}
+              onPinRejected={handlePinRejected}
+            />
+          )}
+          {tab === "whatif" && <WhatIfTab scores={scores} deductions={deductions} />}
+          {tab === "activity" && <ActivityTab scores={scores} />}
+          {tab === "backup" && (
+            <BackupTab
+              state={state}
+              pin={pin}
+              onStateUpdated={setState}
+              onPinRejected={handlePinRejected}
+            />
+          )}
         </>
       )}
 
@@ -251,7 +335,13 @@ function FormPips({ form }: { form: FormEntry[] }) {
   );
 }
 
-function LeagueTable({ rows }: { rows: ReturnType<typeof computeTable> }) {
+function LeagueTable({
+  rows,
+  onSelectPlayer,
+}: {
+  rows: ReturnType<typeof computeTable>;
+  onSelectPlayer: (player: string) => void;
+}) {
   return (
     <section className="card">
       <div className="table-scroll">
@@ -277,7 +367,9 @@ function LeagueTable({ rows }: { rows: ReturnType<typeof computeTable> }) {
               <tr key={row.player} className={i === 0 ? "leader" : i < 4 ? "top-four" : ""}>
                 <td className="num pos">{i + 1}</td>
                 <td className="name">
-                  {row.player}
+                  <button className="linkish" onClick={() => onSelectPlayer(row.player)}>
+                    {row.player}
+                  </button>
                   {row.deducted > 0 && (
                     <span className="ded-badge" title={`${row.deducted} points deducted`}>
                       −{row.deducted}
@@ -302,7 +394,8 @@ function LeagueTable({ rows }: { rows: ReturnType<typeof computeTable> }) {
         </table>
       </div>
       <p className="table-legend">
-        CS = clean sheets · Form = last {FORM_LENGTH} games (newest last) · hover a pip for the result
+        CS = clean sheets · Form = last {FORM_LENGTH} games (newest last) · hover a pip for the
+        result · tap a name for their profile
       </p>
     </section>
   );
