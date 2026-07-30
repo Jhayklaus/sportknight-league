@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
 import { MATCH_BY_ID, isValidScore } from "@/lib/league";
-import { readScores, writeScore } from "@/lib/store";
+import { readState, writeScore } from "@/lib/store";
 import { checkPin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+const STORAGE_ERROR =
+  "Could not save: storage is not configured. On Vercel, connect the Upstash Redis integration (see README) and redeploy.";
+
 export async function GET() {
   try {
-    return NextResponse.json({ scores: await readScores() });
+    return NextResponse.json(await readState());
   } catch (err) {
-    console.error("Failed to read scores:", err);
-    return NextResponse.json({ scores: {}, warning: "storage unavailable" });
+    console.error("Failed to read league state:", err);
+    return NextResponse.json({ scores: {}, deductions: [], warning: "storage unavailable" });
   }
 }
 
@@ -22,11 +25,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { pin, matchId, home, away } = (body ?? {}) as {
+  const { pin, matchId, home, away, noShow } = (body ?? {}) as {
     pin?: unknown;
     matchId?: unknown;
     home?: unknown;
     away?: unknown;
+    noShow?: unknown;
   };
 
   if (!checkPin(pin)) {
@@ -38,9 +42,13 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Rule 5: neither player tried to arrange the game — 0–0, no points for anyone.
+    if (noShow === true) {
+      return NextResponse.json(await writeScore(matchId, { home: 0, away: 0, noShow: true }));
+    }
     // home/away both null clears the result; otherwise both must be integers 0–99.
     if (home === null && away === null) {
-      return NextResponse.json({ scores: await writeScore(matchId, null) });
+      return NextResponse.json(await writeScore(matchId, null));
     }
     if (!isValidScore(home) || !isValidScore(away)) {
       return NextResponse.json(
@@ -48,15 +56,9 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    return NextResponse.json({ scores: await writeScore(matchId, { home, away }) });
+    return NextResponse.json(await writeScore(matchId, { home, away }));
   } catch (err) {
     console.error("Failed to write score:", err);
-    return NextResponse.json(
-      {
-        error:
-          "Could not save: storage is not configured. On Vercel, connect the Upstash Redis integration (see README) and redeploy.",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: STORAGE_ERROR }, { status: 500 });
   }
 }

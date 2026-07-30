@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { Score, Scores } from "./league";
+import type { Deduction, LeagueState, Score } from "./league";
 
 // Two backends:
 //  - Redis over REST (Upstash / Vercel KV) when its env vars are present —
@@ -13,6 +13,8 @@ const REDIS_KEY = "sportknight:scores";
 
 const DATA_DIR = process.env.LEAGUE_DATA_DIR || path.join(process.cwd(), "data");
 const SCORES_FILE = path.join(DATA_DIR, "scores.json");
+
+const EMPTY: LeagueState = { scores: {}, deductions: [] };
 
 function redisConfigured(): boolean {
   return Boolean(REDIS_URL && REDIS_TOKEN);
@@ -33,43 +35,78 @@ async function redisCommand(command: string[]): Promise<unknown> {
   return data.result;
 }
 
-function parseScores(raw: unknown): Scores {
-  if (typeof raw !== "string" || raw === "") return {};
+/**
+ * Accepts both the current `{ scores, deductions }` document and the original
+ * format, which was a bare map of match id -> score.
+ */
+function parseState(raw: unknown): LeagueState {
+  if (typeof raw !== "string" || raw === "") return { scores: {}, deductions: [] };
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? (parsed as Scores) : {};
+    parsed = JSON.parse(raw);
   } catch {
-    return {};
+    return { scores: {}, deductions: [] };
+  }
+  if (!parsed || typeof parsed !== "object") return { scores: {}, deductions: [] };
+
+  const doc = parsed as Record<string, unknown>;
+  if (doc.scores && typeof doc.scores === "object") {
+    return {
+      scores: doc.scores as LeagueState["scores"],
+      deductions: Array.isArray(doc.deductions) ? (doc.deductions as Deduction[]) : [],
+    };
+  }
+  return { scores: doc as LeagueState["scores"], deductions: [] };
+}
+
+export async function readState(): Promise<LeagueState> {
+  if (redisConfigured()) {
+    return parseState(await redisCommand(["GET", REDIS_KEY]));
+  }
+  try {
+    return parseState(fs.readFileSync(SCORES_FILE, "utf8"));
+  } catch {
+    return { scores: {}, deductions: [] };
   }
 }
 
-export async function readScores(): Promise<Scores> {
+async function writeState(state: LeagueState): Promise<LeagueState> {
   if (redisConfigured()) {
-    return parseScores(await redisCommand(["GET", REDIS_KEY]));
+    await redisCommand(["SET", REDIS_KEY, JSON.stringify(state)]);
+    return state;
   }
-  try {
-    return parseScores(fs.readFileSync(SCORES_FILE, "utf8"));
-  } catch {
-    return {};
-  }
-}
-
-export async function writeScore(matchId: string, score: Score | null): Promise<Scores> {
-  const scores = await readScores();
-  if (score === null) {
-    delete scores[matchId];
-  } else {
-    scores[matchId] = score;
-  }
-
-  if (redisConfigured()) {
-    await redisCommand(["SET", REDIS_KEY, JSON.stringify(scores)]);
-    return scores;
-  }
-
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const tmp = SCORES_FILE + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(scores, null, 2));
+  fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
   fs.renameSync(tmp, SCORES_FILE);
-  return scores;
+  return state;
 }
+
+export async function writeScore(matchId: string, score: Score | null): Promise<LeagueState> {
+  const state = await readState();
+  if (score === null) {
+    delete state.scores[matchId];
+  } else {
+    state.scores[matchId] = score;
+  }
+  return writeState(state);
+}
+
+export async function addDeduction(
+  deduction: Omit<Deduction, "id" | "at">
+): Promise<LeagueState> {
+  const state = await readState();
+  state.deductions = [
+    ...state.deductions,
+    { ...deduction, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, at: new Date().toISOString() },
+  ];
+  return writeState(state);
+}
+
+export async function removeDeduction(id: string): Promise<LeagueState> {
+  const state = await readState();
+  state.deductions = state.deductions.filter((d) => d.id !== id);
+  return writeState(state);
+}
+
+export { EMPTY as EMPTY_STATE };
