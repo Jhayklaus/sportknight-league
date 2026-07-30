@@ -17,27 +17,43 @@ import {
   type Scores,
 } from "@/lib/league";
 import { HeadToHeadTab, PlayersTab } from "./PlayerViews";
+import { ActivityTab, BackupTab, DeadlineTab, WhatIfTab } from "./LeagueTools";
 
-type Tab = "table" | "fixtures" | "scorers" | "cleansheets" | "players" | "h2h";
+type Tab =
+  | "table"
+  | "fixtures"
+  | "scorers"
+  | "cleansheets"
+  | "players"
+  | "h2h"
+  | "deadline"
+  | "whatif"
+  | "activity"
+  | "backup";
 
 const PIN_STORAGE_KEY = "sportknight-pin";
 
 export default function LeagueApp() {
   const [tab, setTab] = useState<Tab>("table");
-  const [state, setState] = useState<LeagueState>({ scores: {}, deductions: [] });
+  const [state, setState] = useState<LeagueState>({ scores: {}, deductions: [], window: null });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pin, setPin] = useState<string | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
 
   const { scores, deductions } = state;
+  const leagueWindow = state.window;
 
   const loadState = useCallback(async () => {
     try {
       const res = await fetch("/api/scores", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as LeagueState;
-      setState({ scores: data.scores ?? {}, deductions: data.deductions ?? [] });
+      setState({
+        scores: data.scores ?? {},
+        deductions: data.deductions ?? [],
+        window: data.window ?? null,
+      });
       setLoadError(null);
     } catch {
       setLoadError("Could not load results. Refresh to try again.");
@@ -124,6 +140,30 @@ export default function LeagueApp() {
           <button className={tab === "h2h" ? "tab active" : "tab"} onClick={() => setTab("h2h")}>
             Head to Head
           </button>
+          <button
+            className={tab === "deadline" ? "tab active" : "tab"}
+            onClick={() => setTab("deadline")}
+          >
+            Deadline
+          </button>
+          <button
+            className={tab === "whatif" ? "tab active" : "tab"}
+            onClick={() => setTab("whatif")}
+          >
+            What If
+          </button>
+          <button
+            className={tab === "activity" ? "tab active" : "tab"}
+            onClick={() => setTab("activity")}
+          >
+            Activity
+          </button>
+          <button
+            className={tab === "backup" ? "tab active" : "tab"}
+            onClick={() => setTab("backup")}
+          >
+            Backup
+          </button>
         </nav>
       </header>
 
@@ -162,6 +202,25 @@ export default function LeagueApp() {
             />
           )}
           {tab === "h2h" && <HeadToHeadTab scores={scores} />}
+          {tab === "deadline" && (
+            <DeadlineTab
+              scores={scores}
+              window={leagueWindow}
+              pin={pin}
+              onStateUpdated={setState}
+              onPinRejected={handlePinRejected}
+            />
+          )}
+          {tab === "whatif" && <WhatIfTab scores={scores} deductions={deductions} />}
+          {tab === "activity" && <ActivityTab scores={scores} />}
+          {tab === "backup" && (
+            <BackupTab
+              state={state}
+              pin={pin}
+              onStateUpdated={setState}
+              onPinRejected={handlePinRejected}
+            />
+          )}
         </>
       )}
 

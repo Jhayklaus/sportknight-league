@@ -22,6 +22,8 @@ export interface Score {
    * played count, goals, points, nor clean sheets.
    */
   noShow?: boolean;
+  /** When the result was recorded. Absent for results logged before this was tracked. */
+  at?: string;
 }
 
 export type Scores = Record<string, Score>;
@@ -34,10 +36,20 @@ export interface Deduction {
   at: string;
 }
 
+/** Rule 5: players get 48 hours to play three matchdays. */
+export interface LeagueWindow {
+  firstMatchday: number;
+  startedAt: string;
+}
+
 export interface LeagueState {
   scores: Scores;
   deductions: Deduction[];
+  window?: LeagueWindow | null;
 }
+
+export const WINDOW_MATCHDAYS = 3;
+export const WINDOW_HOURS = 48;
 
 export type FormResult = "W" | "D" | "L" | "N";
 
@@ -455,4 +467,189 @@ export function computeCleanSheets(scores: Scores): CleanSheetRow[] {
       a.played - b.played ||
       a.player.localeCompare(b.player)
   );
+}
+
+// ---------------------------------------------------------------------------
+// 48-hour matchday window (rule 5)
+// ---------------------------------------------------------------------------
+
+export interface ChaseEntry {
+  player: string;
+  outstanding: number;
+  opponents: { opponent: string; matchday: number; home: boolean }[];
+}
+
+export interface WindowStatus {
+  window: LeagueWindow | null;
+  matchdays: number[];
+  deadline: string | null;
+  msRemaining: number | null;
+  overdue: boolean;
+  pending: Match[];
+  played: number;
+  total: number;
+  chase: ChaseEntry[];
+}
+
+/** The matchdays covered by a window, clamped to the season length. */
+export function windowMatchdays(window: LeagueWindow | null | undefined): number[] {
+  if (!window) return [];
+  const out: number[] = [];
+  for (let i = 0; i < WINDOW_MATCHDAYS; i++) {
+    const md = window.firstMatchday + i;
+    if (md >= 1 && md <= MATCHDAYS.length) out.push(md);
+  }
+  return out;
+}
+
+/** First matchday that still has unplayed fixtures — the natural next window. */
+export function suggestedWindowStart(scores: Scores): number {
+  for (const md of MATCHDAYS) {
+    if (md.matches.some((m) => !scores[m.id])) return md.matchday;
+  }
+  return MATCHDAYS.length;
+}
+
+export function computeWindowStatus(
+  scores: Scores,
+  window: LeagueWindow | null | undefined,
+  now: number = Date.now()
+): WindowStatus {
+  const mds = windowMatchdays(window);
+  const matches = ALL_MATCHES.filter((m) => mds.includes(m.matchday));
+  const pending = matches.filter((m) => !scores[m.id]);
+
+  const deadlineMs = window ? new Date(window.startedAt).getTime() + WINDOW_HOURS * 3600_000 : null;
+  const msRemaining = deadlineMs === null ? null : deadlineMs - now;
+
+  const chaseMap = new Map<string, ChaseEntry>();
+  for (const m of pending) {
+    for (const [player, opponent, home] of [
+      [m.home, m.away, true],
+      [m.away, m.home, false],
+    ] as const) {
+      const entry = chaseMap.get(player) ?? { player, outstanding: 0, opponents: [] };
+      entry.outstanding++;
+      entry.opponents.push({ opponent, matchday: m.matchday, home });
+      chaseMap.set(player, entry);
+    }
+  }
+
+  return {
+    window: window ?? null,
+    matchdays: mds,
+    deadline: deadlineMs === null ? null : new Date(deadlineMs).toISOString(),
+    msRemaining,
+    overdue: msRemaining !== null && msRemaining < 0 && pending.length > 0,
+    pending,
+    played: matches.length - pending.length,
+    total: matches.length,
+    chase: [...chaseMap.values()].sort(
+      (a, b) => b.outstanding - a.outstanding || a.player.localeCompare(b.player)
+    ),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// What-if projections
+// ---------------------------------------------------------------------------
+
+export type Outcome = "H" | "D" | "A";
+export type Hypotheticals = Record<string, Outcome>;
+
+/**
+ * Overlays hypothetical outcomes on the real results. Projected games use a
+ * one-goal margin (1–0 / 0–0 / 0–1) so goal difference stays realistic.
+ */
+export function applyHypotheticals(scores: Scores, hypo: Hypotheticals): Scores {
+  const merged: Scores = { ...scores };
+  for (const [matchId, outcome] of Object.entries(hypo)) {
+    if (merged[matchId]) continue; // never override a real result
+    merged[matchId] =
+      outcome === "H" ? { home: 1, away: 0 } : outcome === "A" ? { home: 0, away: 1 } : { home: 0, away: 0 };
+  }
+  return merged;
+}
+
+export interface ProjectedRow extends TableRow {
+  currentPosition: number;
+  movement: number;
+}
+
+export function computeProjection(
+  scores: Scores,
+  hypo: Hypotheticals,
+  deductions: Deduction[] = []
+): ProjectedRow[] {
+  const current = computeTable(scores, deductions);
+  const positions = new Map(current.map((r, i) => [r.player, i + 1]));
+  const projected = computeTable(applyHypotheticals(scores, hypo), deductions);
+  return projected.map((row, i) => {
+    const currentPosition = positions.get(row.player) ?? i + 1;
+    return { ...row, currentPosition, movement: currentPosition - (i + 1) };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Activity feed
+// ---------------------------------------------------------------------------
+
+export interface ActivityEntry {
+  matchId: string;
+  matchday: number;
+  home: string;
+  away: string;
+  homeGoals: number;
+  awayGoals: number;
+  noShow: boolean;
+  at: string | null;
+}
+
+/**
+ * Newest results first. Entries recorded before timestamps were tracked have no
+ * `at` value and are listed after the timestamped ones, latest matchday first.
+ */
+export function computeActivity(scores: Scores): ActivityEntry[] {
+  const entries: ActivityEntry[] = [];
+  for (const match of ALL_MATCHES) {
+    const score = scores[match.id];
+    if (!score) continue;
+    entries.push({
+      matchId: match.id,
+      matchday: match.matchday,
+      home: match.home,
+      away: match.away,
+      homeGoals: score.home,
+      awayGoals: score.away,
+      noShow: Boolean(score.noShow),
+      at: score.at ?? null,
+    });
+  }
+
+  return entries.sort((a, b) => {
+    if (a.at && b.at) return b.at.localeCompare(a.at);
+    if (a.at) return -1;
+    if (b.at) return 1;
+    return b.matchday - a.matchday || a.matchId.localeCompare(b.matchId);
+  });
+}
+
+/** Full season as CSV, for the export/backup tab. */
+export function toCsv(scores: Scores): string {
+  const rows = [["matchday", "home", "away", "home_goals", "away_goals", "no_show", "recorded_at"]];
+  for (const match of ALL_MATCHES) {
+    const score = scores[match.id];
+    rows.push([
+      String(match.matchday),
+      match.home,
+      match.away,
+      score && !score.noShow ? String(score.home) : "",
+      score && !score.noShow ? String(score.away) : "",
+      score?.noShow ? "yes" : "",
+      score?.at ?? "",
+    ]);
+  }
+  return rows
+    .map((r) => r.map((cell) => (/[",\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell)).join(","))
+    .join("\n");
 }

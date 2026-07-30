@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { Deduction, LeagueState, Score } from "./league";
+import type { Deduction, LeagueState, LeagueWindow, Score } from "./league";
 
 // Two backends:
 //  - Redis over REST (Upstash / Vercel KV) when its env vars are present —
@@ -14,7 +14,7 @@ const REDIS_KEY = "sportknight:scores";
 const DATA_DIR = process.env.LEAGUE_DATA_DIR || path.join(process.cwd(), "data");
 const SCORES_FILE = path.join(DATA_DIR, "scores.json");
 
-const EMPTY: LeagueState = { scores: {}, deductions: [] };
+const EMPTY: LeagueState = { scores: {}, deductions: [], window: null };
 
 function redisConfigured(): boolean {
   return Boolean(REDIS_URL && REDIS_TOKEN);
@@ -40,23 +40,24 @@ async function redisCommand(command: string[]): Promise<unknown> {
  * format, which was a bare map of match id -> score.
  */
 function parseState(raw: unknown): LeagueState {
-  if (typeof raw !== "string" || raw === "") return { scores: {}, deductions: [] };
+  if (typeof raw !== "string" || raw === "") return { scores: {}, deductions: [], window: null };
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return { scores: {}, deductions: [] };
+    return { scores: {}, deductions: [], window: null };
   }
-  if (!parsed || typeof parsed !== "object") return { scores: {}, deductions: [] };
+  if (!parsed || typeof parsed !== "object") return { scores: {}, deductions: [], window: null };
 
   const doc = parsed as Record<string, unknown>;
   if (doc.scores && typeof doc.scores === "object") {
     return {
       scores: doc.scores as LeagueState["scores"],
       deductions: Array.isArray(doc.deductions) ? (doc.deductions as Deduction[]) : [],
+      window: (doc.window as LeagueWindow | null | undefined) ?? null,
     };
   }
-  return { scores: doc as LeagueState["scores"], deductions: [] };
+  return { scores: doc as LeagueState["scores"], deductions: [], window: null };
 }
 
 export async function readState(): Promise<LeagueState> {
@@ -66,7 +67,7 @@ export async function readState(): Promise<LeagueState> {
   try {
     return parseState(fs.readFileSync(SCORES_FILE, "utf8"));
   } catch {
-    return { scores: {}, deductions: [] };
+    return { scores: {}, deductions: [], window: null };
   }
 }
 
@@ -87,7 +88,7 @@ export async function writeScore(matchId: string, score: Score | null): Promise<
   if (score === null) {
     delete state.scores[matchId];
   } else {
-    state.scores[matchId] = score;
+    state.scores[matchId] = { ...score, at: new Date().toISOString() };
   }
   return writeState(state);
 }
@@ -107,6 +108,21 @@ export async function removeDeduction(id: string): Promise<LeagueState> {
   const state = await readState();
   state.deductions = state.deductions.filter((d) => d.id !== id);
   return writeState(state);
+}
+
+export async function setWindow(window: LeagueWindow | null): Promise<LeagueState> {
+  const state = await readState();
+  state.window = window;
+  return writeState(state);
+}
+
+/** Wholesale replace, used by the backup restore endpoint. */
+export async function replaceState(next: LeagueState): Promise<LeagueState> {
+  return writeState({
+    scores: next.scores ?? {},
+    deductions: Array.isArray(next.deductions) ? next.deductions : [],
+    window: next.window ?? null,
+  });
 }
 
 export { EMPTY as EMPTY_STATE };
