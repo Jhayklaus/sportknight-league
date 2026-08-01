@@ -18,6 +18,7 @@ import {
 } from "@/lib/league";
 import { HeadToHeadTab, PlayersTab } from "./PlayerViews";
 import { ActivityTab, BackupTab, DeadlineTab, WhatIfTab } from "./LeagueTools";
+import { SeasonsTab } from "./SeasonsTab";
 
 type Tab =
   | "table"
@@ -29,13 +30,20 @@ type Tab =
   | "deadline"
   | "whatif"
   | "activity"
-  | "backup";
+  | "backup"
+  | "seasons";
 
 const PIN_STORAGE_KEY = "sportknight-pin";
 
 export default function LeagueApp() {
   const [tab, setTab] = useState<Tab>("table");
-  const [state, setState] = useState<LeagueState>({ scores: {}, deductions: [], window: null });
+  const [state, setState] = useState<LeagueState>({
+    scores: {},
+    deductions: [],
+    window: null,
+    season: 1,
+    seasons: [],
+  });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pin, setPin] = useState<string | null>(null);
@@ -53,6 +61,8 @@ export default function LeagueApp() {
         scores: data.scores ?? {},
         deductions: data.deductions ?? [],
         window: data.window ?? null,
+        season: data.season ?? 1,
+        seasons: data.seasons ?? [],
       });
       setLoadError(null);
     } catch {
@@ -105,7 +115,7 @@ export default function LeagueApp() {
           <AdminControl pin={pin} onUnlock={handleUnlock} onLock={handleLock} />
         </div>
         <p className="hero-sub">
-          {PLAYERS.length} players · home &amp; away · {ALL_MATCHES.length} matches —{" "}
+          Season {state.season ?? 1} · {PLAYERS.length} players · {ALL_MATCHES.length} matches —{" "}
           {playedCount} played, {ALL_MATCHES.length - playedCount - noShowCount} remaining
           {noShowCount > 0 && ` · ${noShowCount} no-show`}
         </p>
@@ -164,6 +174,12 @@ export default function LeagueApp() {
           >
             Backup
           </button>
+          <button
+            className={tab === "seasons" ? "tab active" : "tab"}
+            onClick={() => setTab("seasons")}
+          >
+            Seasons
+          </button>
         </nav>
       </header>
 
@@ -215,6 +231,14 @@ export default function LeagueApp() {
           {tab === "activity" && <ActivityTab scores={scores} />}
           {tab === "backup" && (
             <BackupTab
+              state={state}
+              pin={pin}
+              onStateUpdated={setState}
+              onPinRejected={handlePinRejected}
+            />
+          )}
+          {tab === "seasons" && (
+            <SeasonsTab
               state={state}
               pin={pin}
               onStateUpdated={setState}

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { Deduction, LeagueState, LeagueWindow, Score } from "./league";
+import { archiveCurrentSeason, isSeasonComplete } from "./league";
+import type { ArchivedSeason, Deduction, LeagueState, LeagueWindow, Score } from "./league";
 
 // Two backends:
 //  - Redis over REST (Upstash / Vercel KV) when its env vars are present —
@@ -14,7 +15,7 @@ const REDIS_KEY = "sportknight:scores";
 const DATA_DIR = process.env.LEAGUE_DATA_DIR || path.join(process.cwd(), "data");
 const SCORES_FILE = path.join(DATA_DIR, "scores.json");
 
-const EMPTY: LeagueState = { scores: {}, deductions: [], window: null };
+const EMPTY: LeagueState = { scores: {}, deductions: [], window: null, season: 1, seasons: [] };
 
 function redisConfigured(): boolean {
   return Boolean(REDIS_URL && REDIS_TOKEN);
@@ -40,14 +41,14 @@ async function redisCommand(command: string[]): Promise<unknown> {
  * format, which was a bare map of match id -> score.
  */
 function parseState(raw: unknown): LeagueState {
-  if (typeof raw !== "string" || raw === "") return { scores: {}, deductions: [], window: null };
+  if (typeof raw !== "string" || raw === "") return { scores: {}, deductions: [], window: null, season: 1, seasons: [] };
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return { scores: {}, deductions: [], window: null };
+    return { scores: {}, deductions: [], window: null, season: 1, seasons: [] };
   }
-  if (!parsed || typeof parsed !== "object") return { scores: {}, deductions: [], window: null };
+  if (!parsed || typeof parsed !== "object") return { scores: {}, deductions: [], window: null, season: 1, seasons: [] };
 
   const doc = parsed as Record<string, unknown>;
   if (doc.scores && typeof doc.scores === "object") {
@@ -55,9 +56,17 @@ function parseState(raw: unknown): LeagueState {
       scores: doc.scores as LeagueState["scores"],
       deductions: Array.isArray(doc.deductions) ? (doc.deductions as Deduction[]) : [],
       window: (doc.window as LeagueWindow | null | undefined) ?? null,
+      season: typeof doc.season === "number" ? doc.season : 1,
+      seasons: Array.isArray(doc.seasons) ? (doc.seasons as ArchivedSeason[]) : [],
     };
   }
-  return { scores: doc as LeagueState["scores"], deductions: [], window: null };
+  return {
+    scores: doc as LeagueState["scores"],
+    deductions: [],
+    window: null,
+    season: 1,
+    seasons: [],
+  };
 }
 
 export async function readState(): Promise<LeagueState> {
@@ -67,8 +76,25 @@ export async function readState(): Promise<LeagueState> {
   try {
     return parseState(fs.readFileSync(SCORES_FILE, "utf8"));
   } catch {
-    return { scores: {}, deductions: [], window: null };
+    return { scores: {}, deductions: [], window: null, season: 1, seasons: [] };
   }
+}
+
+/** Archive the live season and start the next one with a clean slate. */
+export async function rolloverSeason(name?: string): Promise<LeagueState> {
+  const state = await readState();
+  if (!isSeasonComplete(state.scores)) {
+    throw new Error("SEASON_INCOMPLETE");
+  }
+  const number = state.season ?? 1;
+  const archived = archiveCurrentSeason(state, number, name);
+  return writeState({
+    scores: {},
+    deductions: [],
+    window: null,
+    season: number + 1,
+    seasons: [...(state.seasons ?? []), archived],
+  });
 }
 
 async function writeState(state: LeagueState): Promise<LeagueState> {
@@ -122,6 +148,8 @@ export async function replaceState(next: LeagueState): Promise<LeagueState> {
     scores: next.scores ?? {},
     deductions: Array.isArray(next.deductions) ? next.deductions : [],
     window: next.window ?? null,
+    season: typeof next.season === "number" ? next.season : 1,
+    seasons: Array.isArray(next.seasons) ? next.seasons : [],
   });
 }
 

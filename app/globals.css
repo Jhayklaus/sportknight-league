@@ -1383,3 +1383,145 @@ body {
   font-size: 0.85rem;
   margin-top: 8px;
 }
+
+/* ---------- seasons ---------- */
+
+.season-current {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.season-chip {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.season-chip:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.season-chip.live {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  cursor: default;
+}
+
+.season-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06281c;
+}
+
+.season-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.honours {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.honour {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+}
+
+.honour.champ {
+  border-color: var(--gold);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.honour .k {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.honour .v {
+  display: block;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.honour .sub {
+  display: block;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  margin-top: 2px;
+}
+
+.season-meta {
+  margin-bottom: 14px;
+}
+
+.sub-tabs {
+  margin-bottom: 14px;
+}
+
+.sub-tabs .tab {
+  padding: 6px 12px;
+  font-size: 0.82rem;
+}
+
+.new-season {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.confirm-box {
+  background: var(--bg-raised);
+  border: 1px dashed var(--gold);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.confirm-box p {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.confirm-box input {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+  margin-bottom: 10px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mini:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
