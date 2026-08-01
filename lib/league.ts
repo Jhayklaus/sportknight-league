@@ -36,19 +36,47 @@ export interface Deduction {
   at: string;
 }
 
-/** Rule 5: players get 48 hours to play three matchdays. */
+/** Rule 5: players get 48 hours to play a block of matchdays. */
 export interface LeagueWindow {
   firstMatchday: number;
   startedAt: string;
+}
+
+/**
+ * A finished result with player names baked in. Archived seasons store these
+ * rather than match ids, so past seasons stay correct even when the roster or
+ * fixture list changes for a later season.
+ */
+export interface ResolvedMatch {
+  matchday: number;
+  home: string;
+  away: string;
+  homeGoals: number;
+  awayGoals: number;
+  noShow: boolean;
+  at?: string;
+}
+
+export interface ArchivedSeason {
+  id: string;
+  number: number;
+  name: string;
+  players: string[];
+  results: ResolvedMatch[];
+  deductions: Deduction[];
+  endedAt: string;
 }
 
 export interface LeagueState {
   scores: Scores;
   deductions: Deduction[];
   window?: LeagueWindow | null;
+  /** Current season number; seasons before it live in `seasons`. */
+  season?: number;
+  seasons?: ArchivedSeason[];
 }
 
-export const WINDOW_MATCHDAYS = 3;
+export const WINDOW_MATCHDAYS = 4;
 export const WINDOW_HOURS = 48;
 
 export type FormResult = "W" | "D" | "L" | "N";
@@ -125,9 +153,37 @@ function countsForStats(score: Score | undefined): score is Score {
   return Boolean(score && !score.noShow);
 }
 
-export function computeTable(scores: Scores, deductions: Deduction[] = []): TableRow[] {
+/** Resolve the current season's stored scores into name-bearing results. */
+export function resolveMatches(scores: Scores): ResolvedMatch[] {
+  const out: ResolvedMatch[] = [];
+  for (const match of ALL_MATCHES) {
+    const score = scores[match.id];
+    if (!score) continue;
+    out.push({
+      matchday: match.matchday,
+      home: match.home,
+      away: match.away,
+      homeGoals: score.home,
+      awayGoals: score.away,
+      noShow: Boolean(score.noShow),
+      at: score.at,
+    });
+  }
+  return out;
+}
+
+/** Players named anywhere in a set of resolved results. */
+export function playersFromResults(results: ResolvedMatch[]): string[] {
+  return [...new Set(results.flatMap((r) => [r.home, r.away]))].sort();
+}
+
+export function tableFrom(
+  players: string[],
+  results: ResolvedMatch[],
+  deductions: Deduction[] = []
+): TableRow[] {
   const rows = new Map<string, TableRow>(
-    PLAYERS.map((p) => [
+    players.map((p) => [
       p,
       {
         player: p,
@@ -146,10 +202,9 @@ export function computeTable(scores: Scores, deductions: Deduction[] = []): Tabl
     ])
   );
 
-  // ALL_MATCHES is in matchday order, so form accumulates chronologically.
-  for (const match of ALL_MATCHES) {
-    const score = scores[match.id];
-    if (!countsForStats(score)) continue;
+  // Results arrive in matchday order, so form accumulates chronologically.
+  for (const match of results) {
+    if (match.noShow) continue;
 
     const home = rows.get(match.home);
     const away = rows.get(match.away);
@@ -157,20 +212,20 @@ export function computeTable(scores: Scores, deductions: Deduction[] = []): Tabl
 
     home.played++;
     away.played++;
-    home.goalsFor += score.home;
-    home.goalsAgainst += score.away;
-    away.goalsFor += score.away;
-    away.goalsAgainst += score.home;
-    if (score.away === 0) home.cleanSheets++;
-    if (score.home === 0) away.cleanSheets++;
+    home.goalsFor += match.homeGoals;
+    home.goalsAgainst += match.awayGoals;
+    away.goalsFor += match.awayGoals;
+    away.goalsAgainst += match.homeGoals;
+    if (match.awayGoals === 0) home.cleanSheets++;
+    if (match.homeGoals === 0) away.cleanSheets++;
 
     let homeResult: FormResult;
-    if (score.home > score.away) {
+    if (match.homeGoals > match.awayGoals) {
       home.won++;
       home.points += 3;
       away.lost++;
       homeResult = "W";
-    } else if (score.home < score.away) {
+    } else if (match.homeGoals < match.awayGoals) {
       away.won++;
       away.points += 3;
       home.lost++;
@@ -187,16 +242,16 @@ export function computeTable(scores: Scores, deductions: Deduction[] = []): Tabl
       result: homeResult,
       matchday: match.matchday,
       opponent: match.away,
-      scoreFor: score.home,
-      scoreAgainst: score.away,
+      scoreFor: match.homeGoals,
+      scoreAgainst: match.awayGoals,
       home: true,
     });
     away.form.push({
       result: homeResult === "W" ? "L" : homeResult === "L" ? "W" : "D",
       matchday: match.matchday,
       opponent: match.home,
-      scoreFor: score.away,
-      scoreAgainst: score.home,
+      scoreFor: match.awayGoals,
+      scoreAgainst: match.homeGoals,
       home: false,
     });
   }
@@ -224,24 +279,31 @@ export function computeTable(scores: Scores, deductions: Deduction[] = []): Tabl
   );
 }
 
-export function computeTopScorers(scores: Scores): ScorerRow[] {
-  const rows = new Map<string, ScorerRow>(PLAYERS.map((p) => [p, { player: p, played: 0, goals: 0 }]));
+export function computeTable(scores: Scores, deductions: Deduction[] = []): TableRow[] {
+  return tableFrom(PLAYERS, resolveMatches(scores), deductions);
+}
 
-  for (const match of ALL_MATCHES) {
-    const score = scores[match.id];
-    if (!countsForStats(score)) continue;
+export function scorersFrom(players: string[], results: ResolvedMatch[]): ScorerRow[] {
+  const rows = new Map<string, ScorerRow>(players.map((p) => [p, { player: p, played: 0, goals: 0 }]));
+
+  for (const match of results) {
+    if (match.noShow) continue;
     const home = rows.get(match.home);
     const away = rows.get(match.away);
     if (!home || !away) continue;
     home.played++;
     away.played++;
-    home.goals += score.home;
-    away.goals += score.away;
+    home.goals += match.homeGoals;
+    away.goals += match.awayGoals;
   }
 
   return [...rows.values()].sort(
     (a, b) => b.goals - a.goals || a.played - b.played || a.player.localeCompare(b.player)
   );
+}
+
+export function computeTopScorers(scores: Scores): ScorerRow[] {
+  return scorersFrom(PLAYERS, resolveMatches(scores));
 }
 
 export interface PlayerMatch {
@@ -441,23 +503,22 @@ export function computeHeadToHead(a: string, b: string, scores: Scores): HeadToH
   return h2h;
 }
 
-export function computeCleanSheets(scores: Scores): CleanSheetRow[] {
+export function cleanSheetsFrom(players: string[], results: ResolvedMatch[]): CleanSheetRow[] {
   const rows = new Map<string, CleanSheetRow>(
-    PLAYERS.map((p) => [p, { player: p, played: 0, cleanSheets: 0, goalsAgainst: 0 }])
+    players.map((p) => [p, { player: p, played: 0, cleanSheets: 0, goalsAgainst: 0 }])
   );
 
-  for (const match of ALL_MATCHES) {
-    const score = scores[match.id];
-    if (!countsForStats(score)) continue;
+  for (const match of results) {
+    if (match.noShow) continue;
     const home = rows.get(match.home);
     const away = rows.get(match.away);
     if (!home || !away) continue;
     home.played++;
     away.played++;
-    home.goalsAgainst += score.away;
-    away.goalsAgainst += score.home;
-    if (score.away === 0) home.cleanSheets++;
-    if (score.home === 0) away.cleanSheets++;
+    home.goalsAgainst += match.awayGoals;
+    away.goalsAgainst += match.homeGoals;
+    if (match.awayGoals === 0) home.cleanSheets++;
+    if (match.homeGoals === 0) away.cleanSheets++;
   }
 
   return [...rows.values()].sort(
@@ -467,6 +528,33 @@ export function computeCleanSheets(scores: Scores): CleanSheetRow[] {
       a.played - b.played ||
       a.player.localeCompare(b.player)
   );
+}
+
+export function computeCleanSheets(scores: Scores): CleanSheetRow[] {
+  return cleanSheetsFrom(PLAYERS, resolveMatches(scores));
+}
+
+/** Every fixture has a recorded outcome — the precondition for a new season. */
+export function isSeasonComplete(scores: Scores): boolean {
+  return ALL_MATCHES.every((m) => Boolean(scores[m.id]));
+}
+
+/** Snapshot the live season so it can be stored in `seasons`. */
+export function archiveCurrentSeason(
+  state: LeagueState,
+  number: number,
+  name?: string
+): ArchivedSeason {
+  const results = resolveMatches(state.scores);
+  return {
+    id: `season-${number}-${Date.now()}`,
+    number,
+    name: name?.trim() || `Season ${number}`,
+    players: PLAYERS,
+    results,
+    deductions: state.deductions,
+    endedAt: new Date().toISOString(),
+  };
 }
 
 // ---------------------------------------------------------------------------

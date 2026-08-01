@@ -13,12 +13,18 @@ matchdays, with every player in action each matchday.
 - **Player profiles** — position, form, home/away split, biggest win/loss, full
   results and remaining fixtures. Names in the table link straight to them.
 - **Head to head** — both meetings between any two players, with aggregate record.
-- **Deadline tracker** — rule 5's 48-hour, three-matchday window: countdown plus
+- **Deadline tracker** — rule 5's 48-hour window (4 matchdays): countdown plus
   exactly who still owes games, so recorders know who to chase.
 - **What if** — project the table by picking imagined winners for unplayed
   fixtures (nothing is saved).
 - **Activity feed** — the most recently recorded results, newest first.
 - **Export & backup** — download the season as JSON or CSV, and restore a backup.
+- **Seasons** — everyone can browse past seasons (final table, scorers, clean
+  sheets, every result). PIN holders can archive the season and start the next
+  one, but only once every fixture has a result.
+
+Finished seasons are archived with player names baked into each result, so past
+seasons stay correct even if the roster or fixture list changes later.
 
 Scores update the table and scorer rankings instantly.
 
