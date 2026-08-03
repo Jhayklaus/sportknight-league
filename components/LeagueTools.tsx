@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   MATCHDAYS,
   WINDOW_HOURS,
-  WINDOW_MATCHDAYS,
+  DEFAULT_WINDOW_MATCHDAYS,
   computeActivity,
   computeProjection,
   computeWindowStatus,
+  windowSize,
   suggestedWindowStart,
   toCsv,
   type Deduction,
@@ -71,11 +72,20 @@ export function DeadlineTab({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [startMd, setStartMd] = useState(() => suggestedWindowStart(scores));
+  const [size, setSize] = useState(() =>
+    leagueWindow ? windowSize(leagueWindow) : DEFAULT_WINDOW_MATCHDAYS
+  );
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  // Keep the size box in step when the stored window changes.
+  const storedSize = leagueWindow ? windowSize(leagueWindow) : null;
+  useEffect(() => {
+    if (storedSize !== null) setSize(storedSize);
+  }, [storedSize]);
 
   const status = useMemo(
     () => computeWindowStatus(scores, leagueWindow, now),
@@ -110,8 +120,8 @@ export function DeadlineTab({
       <section className="card">
         <h3 className="section-title">48-hour window</h3>
         <p className="muted">
-          No window is running. Rule 5 gives players {WINDOW_HOURS} hours to play{" "}
-          {WINDOW_MATCHDAYS} matchdays — start one to track who still owes games.
+          No window is running. Rule 5 gives players {WINDOW_HOURS} hours to play a
+          block of matchdays — start one to track who still owes games.
         </p>
         {pin ? (
           <div className="window-form">
@@ -125,12 +135,23 @@ export function DeadlineTab({
                 ))}
               </select>
             </label>
+            <label>
+              Matchdays per window
+              <input
+                type="number"
+                min={1}
+                max={MATCHDAYS.length}
+                value={size}
+                onChange={(e) => setSize(Number(e.target.value))}
+                aria-label="Matchdays per window"
+              />
+            </label>
             <button
               className="mini save"
               disabled={busy}
-              onClick={() => send({ firstMatchday: startMd })}
+              onClick={() => send({ firstMatchday: startMd, matchdays: size })}
             >
-              {busy ? "…" : "Start window now"}
+              {busy ? "…" : `Start ${size}-matchday window now`}
             </button>
           </div>
         ) : (
@@ -141,6 +162,7 @@ export function DeadlineTab({
     );
   }
 
+  const currentSize = windowSize(status.window);
   const remaining = status.msRemaining ?? 0;
   const pct = Math.max(
     0,
@@ -155,7 +177,8 @@ export function DeadlineTab({
             Matchdays {status.matchdays[0]}–{status.matchdays[status.matchdays.length - 1]}
           </h3>
           <p className="muted">
-            {status.played} of {status.total} fixtures played
+            {status.played} of {status.total} fixtures played · {currentSize} matchdays per{" "}
+            {WINDOW_HOURS}h
           </p>
         </div>
         <div className={status.overdue ? "countdown over" : "countdown"}>
@@ -213,10 +236,38 @@ export function DeadlineTab({
             className="mini save"
             disabled={busy}
             onClick={() =>
-              send({ firstMatchday: status.window!.firstMatchday + WINDOW_MATCHDAYS })
+              send({
+                firstMatchday: status.window!.firstMatchday + currentSize,
+                matchdays: currentSize,
+              })
             }
           >
-            Start next window (MD{status.window.firstMatchday + WINDOW_MATCHDAYS})
+            Start next window (MD{status.window.firstMatchday + currentSize})
+          </button>
+          <label>
+            Resize to
+            <input
+              type="number"
+              min={1}
+              max={MATCHDAYS.length}
+              value={size}
+              onChange={(e) => setSize(Number(e.target.value))}
+              aria-label="Resize window to matchdays"
+            />
+          </label>
+          <button
+            className="mini"
+            disabled={busy || size === currentSize}
+            onClick={() =>
+              send({
+                firstMatchday: status.window!.firstMatchday,
+                startedAt: status.window!.startedAt,
+                matchdays: size,
+              })
+            }
+            title="Change how many matchdays this window covers, keeping the countdown"
+          >
+            Apply
           </button>
           <button className="mini ghost" disabled={busy} onClick={() => send({ clear: true })}>
             Clear window

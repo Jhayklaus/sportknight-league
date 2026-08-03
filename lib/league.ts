@@ -40,6 +40,8 @@ export interface Deduction {
 export interface LeagueWindow {
   firstMatchday: number;
   startedAt: string;
+  /** How many matchdays this window covers. Falls back to the default. */
+  matchdays?: number;
 }
 
 /**
@@ -76,7 +78,8 @@ export interface LeagueState {
   seasons?: ArchivedSeason[];
 }
 
-export const WINDOW_MATCHDAYS = 6;
+/** Used when a window does not carry its own size (older stored windows). */
+export const DEFAULT_WINDOW_MATCHDAYS = 6;
 export const WINDOW_HOURS = 48;
 
 export type FormResult = "W" | "D" | "L" | "N";
@@ -580,10 +583,18 @@ export interface WindowStatus {
 }
 
 /** The matchdays covered by a window, clamped to the season length. */
+/** How many matchdays a window covers, clamped to something sensible. */
+export function windowSize(window: LeagueWindow | null | undefined): number {
+  const raw = window?.matchdays ?? DEFAULT_WINDOW_MATCHDAYS;
+  if (!Number.isInteger(raw) || raw < 1) return DEFAULT_WINDOW_MATCHDAYS;
+  return Math.min(raw, MATCHDAYS.length);
+}
+
 export function windowMatchdays(window: LeagueWindow | null | undefined): number[] {
   if (!window) return [];
   const out: number[] = [];
-  for (let i = 0; i < WINDOW_MATCHDAYS; i++) {
+  const size = windowSize(window);
+  for (let i = 0; i < size; i++) {
     const md = window.firstMatchday + i;
     if (md >= 1 && md <= MATCHDAYS.length) out.push(md);
   }

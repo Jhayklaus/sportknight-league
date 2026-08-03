@@ -13,8 +13,10 @@ matchdays, with every player in action each matchday.
 - **Player profiles** — position, form, home/away split, biggest win/loss, full
   results and remaining fixtures. Names in the table link straight to them.
 - **Head to head** — both meetings between any two players, with aggregate record.
-- **Deadline tracker** — rule 5's 48-hour window (4 matchdays): countdown plus
-  exactly who still owes games, so recorders know who to chase.
+- **Deadline tracker** — rule 5's 48-hour play window: recorders choose how many
+  matchdays it covers (default 6) and can resize a running window without
+  restarting its countdown. Shows the countdown, an overdue state, outstanding
+  fixtures and a ranked "who needs chasing" list.
 - **What if** — project the table by picking imagined winners for unplayed
   fixtures (nothing is saved).
 - **Activity feed** — the most recently recorded results, newest first.
