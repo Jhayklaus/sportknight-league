@@ -76,7 +76,7 @@ export interface LeagueState {
   seasons?: ArchivedSeason[];
 }
 
-export const WINDOW_MATCHDAYS = 4;
+export const WINDOW_MATCHDAYS = 6;
 export const WINDOW_HOURS = 48;
 
 export type FormResult = "W" | "D" | "L" | "N";
