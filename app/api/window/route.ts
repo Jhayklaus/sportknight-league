@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { MATCHDAYS } from "@/lib/league";
+import { DEFAULT_WINDOW_MATCHDAYS, MATCHDAYS } from "@/lib/league";
 import { setWindow } from "@/lib/store";
 import { checkPin } from "@/lib/auth";
 
@@ -13,10 +13,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { pin, firstMatchday, startedAt, clear } = (body ?? {}) as {
+  const { pin, firstMatchday, startedAt, matchdays, clear } = (body ?? {}) as {
     pin?: unknown;
     firstMatchday?: unknown;
     startedAt?: unknown;
+    matchdays?: unknown;
     clear?: unknown;
   };
 
@@ -43,8 +44,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid start time" }, { status: 400 });
     }
 
+    const size = matchdays === undefined ? DEFAULT_WINDOW_MATCHDAYS : matchdays;
+    if (
+      typeof size !== "number" ||
+      !Number.isInteger(size) ||
+      size < 1 ||
+      size > MATCHDAYS.length
+    ) {
+      return NextResponse.json(
+        { error: `Matchdays per window must be a whole number between 1 and ${MATCHDAYS.length}` },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      await setWindow({ firstMatchday, startedAt: started.toISOString() })
+      await setWindow({ firstMatchday, startedAt: started.toISOString(), matchdays: size })
     );
   } catch (err) {
     console.error("Failed to set window:", err);
