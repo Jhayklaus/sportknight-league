@@ -1525,3 +1525,285 @@ body {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ---------- directory & league creation ---------- */
+
+.hero-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.league-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.league-list li {
+  border-bottom: 1px solid rgba(38, 49, 86, 0.5);
+}
+
+.league-list li:last-child {
+  border-bottom: none;
+}
+
+.league-link {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 6px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.league-link:hover .league-name {
+  color: var(--accent);
+}
+
+.league-name {
+  font-weight: 700;
+  font-size: 1.02rem;
+}
+
+.create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.create-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.create-form label.narrow {
+  max-width: 240px;
+}
+
+.create-form input,
+.create-form textarea {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.create-form input:focus,
+.create-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.create-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.create-done p {
+  margin: 0 0 10px;
+}
+
+/* ---------- roster ---------- */
+
+.roster-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.roster-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid rgba(38, 49, 86, 0.5);
+}
+
+.roster-list li:last-child {
+  border-bottom: none;
+}
+
+.roster-list.compact li {
+  padding: 5px 4px;
+}
+
+.roster-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.roster-add,
+.rename-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+
+.roster-add input,
+.rename-form input {
+  flex: 1;
+  min-width: 160px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
+.roster-add input:focus,
+.rename-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.roster-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0 6px;
+}
+
+.relegation-setting {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.banner.warn {
+  border-color: var(--gold);
+  color: var(--gold);
+  margin-bottom: 14px;
+}
+
+/* ---------- relegation in the rollover ---------- */
+
+.releg-head {
+  margin: 14px 0 4px;
+  font-size: 0.85rem;
+}
+
+.releg-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.releg-list li {
+  border-bottom: 1px solid rgba(38, 49, 86, 0.5);
+}
+
+.releg-list li:last-child {
+  border-bottom: none;
+}
+
+.releg-list label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.releg-list label:hover {
+  background: rgba(52, 211, 153, 0.05);
+}
+
+.releg-pos {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  min-width: 20px;
+  text-align: right;
+}
+
+.releg-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.next-roster {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- hall of fame ---------- */
+
+.hof-seasons {
+  margin-top: 16px;
+}
+
+.hof-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.hof-col {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.hof-col h5 {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.hof-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hof-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(38, 49, 86, 0.4);
+  font-size: 0.9rem;
+}
+
+.hof-list li:last-child {
+  border-bottom: none;
+}
+
+.hof-medal {
+  width: 22px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.hof-name {
+  flex: 1;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hof-value {
+  color: var(--accent);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}

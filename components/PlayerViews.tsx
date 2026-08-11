@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from "react";
 import {
-  PLAYERS,
   computeHeadToHead,
   computePlayerProfile,
   type Deduction,
   type FormResult,
   type PlayerMatch,
+  type LeagueView,
   type PlayerProfile,
   type Scores,
   type SplitStats,
@@ -223,19 +223,21 @@ export function PlayerProfileView({
 }
 
 export function PlayersTab({
+  view,
   scores,
   deductions,
   selected,
   onSelect,
 }: {
+  view: LeagueView;
   scores: Scores;
   deductions: Deduction[];
   selected: string | null;
   onSelect: (player: string | null) => void;
 }) {
   const profile = useMemo(
-    () => (selected ? computePlayerProfile(selected, scores, deductions) : null),
-    [selected, scores, deductions]
+    () => (selected ? computePlayerProfile(view, selected, scores, deductions) : null),
+    [view, selected, scores, deductions]
   );
 
   if (profile) {
@@ -253,7 +255,7 @@ export function PlayersTab({
     <section className="card">
       <h3 className="section-title">Player profiles</h3>
       <div className="player-grid">
-        {PLAYERS.map((p) => (
+        {view.players.map((p) => (
           <button key={p} className="player-chip" onClick={() => onSelect(p)}>
             {p}
           </button>
@@ -263,12 +265,14 @@ export function PlayersTab({
   );
 }
 
-export function HeadToHeadTab({ scores }: { scores: Scores }) {
-  const [a, setA] = useState(PLAYERS[0]);
-  const [b, setB] = useState(PLAYERS[1]);
+export function HeadToHeadTab({ view, scores }: { view: LeagueView; scores: Scores }) {
+  const players = view.players;
+  const [a, setA] = useState(players[0] ?? "");
+  const [b, setB] = useState(players[1] ?? "");
 
-  const h2h = useMemo(() => computeHeadToHead(a, b, scores), [a, b, scores]);
+  const h2h = useMemo(() => computeHeadToHead(view, a, b, scores), [view, a, b, scores]);
   const samePlayer = a === b;
+  const notEnough = players.length < 2;
 
   const swap = () => {
     setA(b);
@@ -281,7 +285,7 @@ export function HeadToHeadTab({ scores }: { scores: Scores }) {
 
       <div className="h2h-pickers">
         <select value={a} onChange={(e) => setA(e.target.value)} aria-label="First player">
-          {PLAYERS.map((p) => (
+          {players.map((p) => (
             <option key={p} value={p}>
               {p}
             </option>
@@ -291,7 +295,7 @@ export function HeadToHeadTab({ scores }: { scores: Scores }) {
           ⇄
         </button>
         <select value={b} onChange={(e) => setB(e.target.value)} aria-label="Second player">
-          {PLAYERS.map((p) => (
+          {players.map((p) => (
             <option key={p} value={p}>
               {p}
             </option>
@@ -299,7 +303,9 @@ export function HeadToHeadTab({ scores }: { scores: Scores }) {
         </select>
       </div>
 
-      {samePlayer ? (
+      {notEnough ? (
+        <p className="muted">Not enough players yet.</p>
+      ) : samePlayer ? (
         <p className="muted">Pick two different players.</p>
       ) : (
         <>

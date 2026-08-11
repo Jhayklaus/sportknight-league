@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  MATCHDAYS,
   WINDOW_HOURS,
   DEFAULT_WINDOW_MATCHDAYS,
   computeActivity,
@@ -13,11 +12,12 @@ import {
   toCsv,
   type Deduction,
   type Hypotheticals,
-  type LeagueState,
+  type LeagueView,
   type LeagueWindow,
   type Outcome,
   type Scores,
 } from "@/lib/league";
+import type { PublicLeague } from "@/lib/leagues";
 
 /* ------------------------------------------------------------------ utils */
 
@@ -56,24 +56,28 @@ async function postJson(
 /* ------------------------------------------------------- deadline tracker */
 
 export function DeadlineTab({
+  view,
   scores,
   window: leagueWindow,
-  pin,
-  onStateUpdated,
-  onPinRejected,
+  slug,
+  code,
+  onLeagueUpdated,
+  onCodeRejected,
 }: {
+  view: LeagueView;
   scores: Scores;
   window: LeagueWindow | null | undefined;
-  pin: string | null;
-  onStateUpdated: (state: LeagueState) => void;
-  onPinRejected: () => void;
+  slug: string;
+  code: string | null;
+  onLeagueUpdated: (league: PublicLeague) => void;
+  onCodeRejected: () => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [startMd, setStartMd] = useState(() => suggestedWindowStart(scores));
+  const [startMd, setStartMd] = useState(() => suggestedWindowStart(view, scores));
   const [size, setSize] = useState(() =>
-    leagueWindow ? windowSize(leagueWindow) : DEFAULT_WINDOW_MATCHDAYS
+    leagueWindow ? windowSize(view, leagueWindow) : DEFAULT_WINDOW_MATCHDAYS
   );
 
   useEffect(() => {
@@ -82,32 +86,35 @@ export function DeadlineTab({
   }, []);
 
   // Keep the size box in step when the stored window changes.
-  const storedSize = leagueWindow ? windowSize(leagueWindow) : null;
+  const storedSize = leagueWindow ? windowSize(view, leagueWindow) : null;
   useEffect(() => {
     if (storedSize !== null) setSize(storedSize);
   }, [storedSize]);
 
   const status = useMemo(
-    () => computeWindowStatus(scores, leagueWindow, now),
-    [scores, leagueWindow, now]
+    () => computeWindowStatus(view, scores, leagueWindow, now),
+    [view, scores, leagueWindow, now]
   );
 
   const send = async (payload: Record<string, unknown>) => {
-    if (!pin || busy) return;
+    if (!code || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const { ok, status: code, data } = await postJson("/api/window", { pin, ...payload });
-      if (code === 401) {
-        setError("PIN no longer valid — unlock again");
-        onPinRejected();
+      const { ok, status, data } = await postJson(`/api/leagues/${slug}/window`, {
+        code,
+        ...payload,
+      });
+      if (status === 401) {
+        setError("Code no longer valid — unlock again");
+        onCodeRejected();
         return;
       }
       if (!ok) {
         setError((data.error as string) ?? "Save failed");
         return;
       }
-      onStateUpdated(data as unknown as LeagueState);
+      onLeagueUpdated(data.league as PublicLeague);
     } catch {
       setError("Network error — try again");
     } finally {
@@ -123,12 +130,12 @@ export function DeadlineTab({
           No window is running. Rule 5 gives players {WINDOW_HOURS} hours to play a
           block of matchdays — start one to track who still owes games.
         </p>
-        {pin ? (
+        {code ? (
           <div className="window-form">
             <label>
               Start at matchday
               <select value={startMd} onChange={(e) => setStartMd(Number(e.target.value))}>
-                {MATCHDAYS.map((md) => (
+                {view.matchdays.map((md) => (
                   <option key={md.matchday} value={md.matchday}>
                     {md.matchday}
                   </option>
@@ -140,7 +147,7 @@ export function DeadlineTab({
               <input
                 type="number"
                 min={1}
-                max={MATCHDAYS.length}
+                max={view.matchdays.length}
                 value={size}
                 onChange={(e) => setSize(Number(e.target.value))}
                 aria-label="Matchdays per window"
@@ -162,7 +169,7 @@ export function DeadlineTab({
     );
   }
 
-  const currentSize = windowSize(status.window);
+  const currentSize = windowSize(view, status.window);
   const remaining = status.msRemaining ?? 0;
   const pct = Math.max(
     0,
@@ -230,7 +237,7 @@ export function DeadlineTab({
         </>
       )}
 
-      {pin && (
+      {code && (
         <div className="window-form">
           <button
             className="mini save"
@@ -249,7 +256,7 @@ export function DeadlineTab({
             <input
               type="number"
               min={1}
-              max={MATCHDAYS.length}
+              max={view.matchdays.length}
               value={size}
               onChange={(e) => setSize(Number(e.target.value))}
               aria-label="Resize window to matchdays"
@@ -282,22 +289,24 @@ export function DeadlineTab({
 /* --------------------------------------------------------- what-if table */
 
 export function WhatIfTab({
+  view,
   scores,
   deductions,
 }: {
+  view: LeagueView;
   scores: Scores;
   deductions: Deduction[];
 }) {
   const [hypo, setHypo] = useState<Hypotheticals>({});
-  const [matchday, setMatchday] = useState(() => suggestedWindowStart(scores));
+  const [matchday, setMatchday] = useState(() => suggestedWindowStart(view, scores));
 
   const projection = useMemo(
-    () => computeProjection(scores, hypo, deductions),
-    [scores, hypo, deductions]
+    () => computeProjection(view, scores, hypo, deductions),
+    [view, scores, hypo, deductions]
   );
 
-  const md = MATCHDAYS.find((m) => m.matchday === matchday) ?? MATCHDAYS[0];
-  const pending = md.matches.filter((m) => !scores[m.id]);
+  const md = view.matchdays.find((m) => m.matchday === matchday) ?? view.matchdays[0];
+  const pending = md ? md.matches.filter((m) => !scores[m.id]) : [];
   const setCount = Object.keys(hypo).length;
 
   const setOutcome = (matchId: string, outcome: Outcome) =>
@@ -315,7 +324,7 @@ export function WhatIfTab({
           <h3 className="section-title">What if…</h3>
           <div className="whatif-controls">
             <select value={matchday} onChange={(e) => setMatchday(Number(e.target.value))}>
-              {MATCHDAYS.map((m) => (
+              {view.matchdays.map((m) => (
                 <option key={m.matchday} value={m.matchday}>
                   Matchday {m.matchday}
                 </option>
@@ -404,8 +413,8 @@ export function WhatIfTab({
 
 /* ----------------------------------------------------------- activity feed */
 
-export function ActivityTab({ scores }: { scores: Scores }) {
-  const entries = useMemo(() => computeActivity(scores), [scores]);
+export function ActivityTab({ view, scores }: { view: LeagueView; scores: Scores }) {
+  const entries = useMemo(() => computeActivity(view, scores), [view, scores]);
   const timestamped = entries.filter((e) => e.at);
   const legacy = entries.filter((e) => !e.at);
 
@@ -457,15 +466,19 @@ export function ActivityTab({ scores }: { scores: Scores }) {
 /* --------------------------------------------------------- export / backup */
 
 export function BackupTab({
-  state,
-  pin,
-  onStateUpdated,
-  onPinRejected,
+  league,
+  view,
+  slug,
+  code,
+  onLeagueUpdated,
+  onCodeRejected,
 }: {
-  state: LeagueState;
-  pin: string | null;
-  onStateUpdated: (state: LeagueState) => void;
-  onPinRejected: () => void;
+  league: PublicLeague;
+  view: LeagueView;
+  slug: string;
+  code: string | null;
+  onLeagueUpdated: (league: PublicLeague) => void;
+  onCodeRejected: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -485,26 +498,26 @@ export function BackupTab({
   };
 
   const stamp = new Date().toISOString().slice(0, 10);
-  const resultCount = Object.keys(state.scores).length;
+  const resultCount = Object.keys(league.scores).length;
 
   const restore = async (file: File) => {
-    if (!pin || busy) return;
+    if (!code || busy) return;
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
       const backup = JSON.parse(await file.text());
-      const { ok, status, data } = await postJson("/api/backup", { pin, backup });
+      const { ok, status, data } = await postJson(`/api/leagues/${slug}/backup`, { code, backup });
       if (status === 401) {
-        setError("PIN no longer valid — unlock again");
-        onPinRejected();
+        setError("Code no longer valid — unlock again");
+        onCodeRejected();
         return;
       }
       if (!ok) {
         setError((data.error as string) ?? "Restore failed");
         return;
       }
-      onStateUpdated(data as unknown as LeagueState);
+      onLeagueUpdated(data.league as PublicLeague);
       setMessage("Backup restored.");
     } catch {
       setError("That file could not be read as JSON.");
@@ -517,8 +530,8 @@ export function BackupTab({
     <section className="card">
       <h3 className="section-title">Export &amp; backup</h3>
       <p className="muted">
-        {resultCount} result{resultCount === 1 ? "" : "s"} and {state.deductions.length} deduction
-        {state.deductions.length === 1 ? "" : "s"} stored. Download a copy any time — keep it
+        {resultCount} result{resultCount === 1 ? "" : "s"} and {league.deductions.length} deduction
+        {league.deductions.length === 1 ? "" : "s"} stored. Download a copy any time — keep it
         somewhere safe and the season can always be rebuilt.
       </p>
 
@@ -527,8 +540,8 @@ export function BackupTab({
           className="mini save"
           onClick={() =>
             download(
-              JSON.stringify({ exportedAt: new Date().toISOString(), ...state }, null, 2),
-              `sportknight-backup-${stamp}.json`,
+              JSON.stringify({ exportedAt: new Date().toISOString(), ...league }, null, 2),
+              `${league.slug}-backup-${stamp}.json`,
               "application/json"
             )
           }
@@ -537,13 +550,15 @@ export function BackupTab({
         </button>
         <button
           className="mini"
-          onClick={() => download(toCsv(state.scores), `sportknight-results-${stamp}.csv`, "text/csv")}
+          onClick={() =>
+            download(toCsv(view, league.scores), `${league.slug}-results-${stamp}.csv`, "text/csv")
+          }
         >
           ⬇ Download results CSV
         </button>
       </div>
 
-      {pin && (
+      {code && (
         <div className="restore-box">
           <h4 className="sub-head">Restore from backup</h4>
           <p className="muted">

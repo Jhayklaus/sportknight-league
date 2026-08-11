@@ -1,24 +1,26 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ALL_MATCHES,
   FORM_LENGTH,
-  MATCHDAYS,
-  PLAYERS,
+  buildView,
   computeCleanSheets,
   computeTable,
   computeTopScorers,
   type Deduction,
   type FormEntry,
-  type LeagueState,
+  type LeagueView,
   type Match,
   type Score,
   type Scores,
 } from "@/lib/league";
+import type { PublicLeague } from "@/lib/leagues";
 import { HeadToHeadTab, PlayersTab } from "./PlayerViews";
 import { ActivityTab, BackupTab, DeadlineTab, WhatIfTab } from "./LeagueTools";
 import { SeasonsTab } from "./SeasonsTab";
+import { HallOfFameTab } from "./HallOfFame";
+import { RosterTab } from "./RosterTab";
 
 type Tab =
   | "table"
@@ -30,222 +32,246 @@ type Tab =
   | "deadline"
   | "whatif"
   | "activity"
-  | "backup"
-  | "seasons";
+  | "halloffame"
+  | "seasons"
+  | "roster"
+  | "backup";
 
-const PIN_STORAGE_KEY = "sportknight-pin";
+const TABS: [Tab, string][] = [
+  ["table", "Table"],
+  ["fixtures", "Fixtures & Results"],
+  ["scorers", "Top Scorers"],
+  ["cleansheets", "Clean Sheets"],
+  ["players", "Players"],
+  ["h2h", "Head to Head"],
+  ["deadline", "Deadline"],
+  ["whatif", "What If"],
+  ["activity", "Activity"],
+  ["halloffame", "Hall of Fame"],
+  ["seasons", "Seasons"],
+  ["roster", "Roster"],
+  ["backup", "Backup"],
+];
 
-export default function LeagueApp() {
+const codeKey = (slug: string) => `sportknight-code-${slug}`;
+
+export default function LeagueApp({ slug, showDirectoryLink = true }: { slug: string; showDirectoryLink?: boolean }) {
   const [tab, setTab] = useState<Tab>("table");
-  const [state, setState] = useState<LeagueState>({
-    scores: {},
-    deductions: [],
-    window: null,
-    season: 1,
-    seasons: [],
-  });
+  const [league, setLeague] = useState<PublicLeague | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [pin, setPin] = useState<string | null>(null);
+  const [code, setCode] = useState<string | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
 
-  const { scores, deductions } = state;
-  const leagueWindow = state.window;
-
-  const loadState = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/scores", { cache: "no-store" });
+      const res = await fetch(`/api/leagues/${slug}`, { cache: "no-store" });
+      if (res.status === 404) {
+        setLoadError("That league does not exist.");
+        return;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as LeagueState;
-      setState({
-        scores: data.scores ?? {},
-        deductions: data.deductions ?? [],
-        window: data.window ?? null,
-        season: data.season ?? 1,
-        seasons: data.seasons ?? [],
-      });
+      const data = (await res.json()) as { league: PublicLeague };
+      setLeague(data.league);
       setLoadError(null);
     } catch {
-      setLoadError("Could not load results. Refresh to try again.");
+      setLoadError("Could not load the league. Refresh to try again.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [slug]);
 
   useEffect(() => {
-    loadState();
-    const saved = sessionStorage.getItem(PIN_STORAGE_KEY);
-    if (saved) setPin(saved);
-  }, [loadState]);
+    load();
+    const saved = sessionStorage.getItem(codeKey(slug));
+    if (saved) setCode(saved);
+  }, [load, slug]);
 
-  const table = useMemo(() => computeTable(scores, deductions), [scores, deductions]);
-  const scorers = useMemo(() => computeTopScorers(scores), [scores]);
-  const cleanSheets = useMemo(() => computeCleanSheets(scores), [scores]);
+  const view: LeagueView = useMemo(
+    () => buildView(league?.players ?? [], league?.fixtures ?? []),
+    [league?.players, league?.fixtures]
+  );
 
-  const playedCount = Object.values(scores).filter((s) => !s.noShow).length;
-  const noShowCount = Object.values(scores).filter((s) => s.noShow).length;
+  const scores = league?.scores ?? {};
+  const deductions = league?.deductions ?? [];
 
-  const handleUnlock = (nextPin: string) => {
-    setPin(nextPin);
-    sessionStorage.setItem(PIN_STORAGE_KEY, nextPin);
+  const table = useMemo(() => computeTable(view, scores, deductions), [view, scores, deductions]);
+  const scorers = useMemo(() => computeTopScorers(view, scores), [view, scores]);
+  const cleanSheets = useMemo(() => computeCleanSheets(view, scores), [view, scores]);
+
+  const handleUnlock = (next: string) => {
+    setCode(next);
+    sessionStorage.setItem(codeKey(slug), next);
   };
-
   const handleLock = () => {
-    setPin(null);
-    sessionStorage.removeItem(PIN_STORAGE_KEY);
+    setCode(null);
+    sessionStorage.removeItem(codeKey(slug));
   };
-
-  const handlePinRejected = useCallback(() => {
-    setPin(null);
-    sessionStorage.removeItem(PIN_STORAGE_KEY);
-  }, []);
+  const handleCodeRejected = useCallback(() => {
+    setCode(null);
+    sessionStorage.removeItem(codeKey(slug));
+  }, [slug]);
 
   const openProfile = useCallback((player: string) => {
     setSelectedPlayer(player);
     setTab("players");
   }, []);
 
+  if (loading) {
+    return (
+      <main className="shell">
+        <p className="banner">Loading league…</p>
+      </main>
+    );
+  }
+
+  if (!league) {
+    return (
+      <main className="shell">
+        <p className="banner error">{loadError ?? "League not found."}</p>
+        <p>
+          <Link href="/leagues" className="linkish">
+            ← All leagues
+          </Link>
+        </p>
+      </main>
+    );
+  }
+
+  const playedCount = Object.values(scores).filter((s) => !s.noShow).length;
+  const noShowCount = Object.values(scores).filter((s) => s.noShow).length;
+  const total = view.allMatches.length;
+  const needsSetup = total === 0;
+
   return (
     <main className="shell">
       <header className="hero">
         <div className="hero-top">
           <h1>
-            <span className="crest">⚔️</span> SportKnight League
+            <span className="crest">⚔️</span> {league.name}
           </h1>
-          <AdminControl pin={pin} onUnlock={handleUnlock} onLock={handleLock} />
+          <div className="hero-actions">
+            {showDirectoryLink && (
+              <Link href="/leagues" className="admin-btn">
+                All leagues
+              </Link>
+            )}
+            <AdminControl
+              slug={slug}
+              code={code}
+              onUnlock={handleUnlock}
+              onLock={handleLock}
+            />
+          </div>
         </div>
         <p className="hero-sub">
-          Season {state.season ?? 1} · {PLAYERS.length} players · {ALL_MATCHES.length} matches —{" "}
-          {playedCount} played, {ALL_MATCHES.length - playedCount - noShowCount} remaining
-          {noShowCount > 0 && ` · ${noShowCount} no-show`}
+          Season {league.season} · {league.players.length} players
+          {total > 0 && (
+            <>
+              {" "}
+              · {total} matches — {playedCount} played, {total - playedCount - noShowCount} remaining
+              {noShowCount > 0 && ` · ${noShowCount} no-show`}
+            </>
+          )}
         </p>
         <nav className="tabs" aria-label="Sections">
-          <button className={tab === "table" ? "tab active" : "tab"} onClick={() => setTab("table")}>
-            Table
-          </button>
-          <button
-            className={tab === "fixtures" ? "tab active" : "tab"}
-            onClick={() => setTab("fixtures")}
-          >
-            Fixtures &amp; Results
-          </button>
-          <button
-            className={tab === "scorers" ? "tab active" : "tab"}
-            onClick={() => setTab("scorers")}
-          >
-            Top Scorers
-          </button>
-          <button
-            className={tab === "cleansheets" ? "tab active" : "tab"}
-            onClick={() => setTab("cleansheets")}
-          >
-            Clean Sheets
-          </button>
-          <button
-            className={tab === "players" ? "tab active" : "tab"}
-            onClick={() => setTab("players")}
-          >
-            Players
-          </button>
-          <button className={tab === "h2h" ? "tab active" : "tab"} onClick={() => setTab("h2h")}>
-            Head to Head
-          </button>
-          <button
-            className={tab === "deadline" ? "tab active" : "tab"}
-            onClick={() => setTab("deadline")}
-          >
-            Deadline
-          </button>
-          <button
-            className={tab === "whatif" ? "tab active" : "tab"}
-            onClick={() => setTab("whatif")}
-          >
-            What If
-          </button>
-          <button
-            className={tab === "activity" ? "tab active" : "tab"}
-            onClick={() => setTab("activity")}
-          >
-            Activity
-          </button>
-          <button
-            className={tab === "backup" ? "tab active" : "tab"}
-            onClick={() => setTab("backup")}
-          >
-            Backup
-          </button>
-          <button
-            className={tab === "seasons" ? "tab active" : "tab"}
-            onClick={() => setTab("seasons")}
-          >
-            Seasons
-          </button>
+          {TABS.map(([key, label]) => (
+            <button
+              key={key}
+              className={tab === key ? "tab active" : "tab"}
+              onClick={() => setTab(key)}
+            >
+              {label}
+            </button>
+          ))}
         </nav>
       </header>
 
       {loadError && <p className="banner error">{loadError}</p>}
-      {loading ? (
-        <p className="banner">Loading league data…</p>
-      ) : (
+
+      {needsSetup && tab !== "roster" && tab !== "backup" && tab !== "halloffame" && (
+        <p className="banner">
+          No fixtures yet. {code ? "Add players in the Roster tab, then generate the schedule." : "A record keeper needs to add players and generate the schedule."}
+        </p>
+      )}
+
+      {tab === "table" && (
         <>
-          {tab === "table" && (
-            <>
-              <LeagueTable rows={table} onSelectPlayer={openProfile} />
-              <DeductionsPanel
-                deductions={deductions}
-                pin={pin}
-                onStateUpdated={setState}
-                onPinRejected={handlePinRejected}
-              />
-            </>
-          )}
-          {tab === "fixtures" && (
-            <Fixtures
-              scores={scores}
-              pin={pin}
-              onStateUpdated={setState}
-              onPinRejected={handlePinRejected}
-            />
-          )}
-          {tab === "scorers" && <TopScorers rows={scorers} />}
-          {tab === "cleansheets" && <CleanSheets rows={cleanSheets} />}
-          {tab === "players" && (
-            <PlayersTab
-              scores={scores}
-              deductions={deductions}
-              selected={selectedPlayer}
-              onSelect={setSelectedPlayer}
-            />
-          )}
-          {tab === "h2h" && <HeadToHeadTab scores={scores} />}
-          {tab === "deadline" && (
-            <DeadlineTab
-              scores={scores}
-              window={leagueWindow}
-              pin={pin}
-              onStateUpdated={setState}
-              onPinRejected={handlePinRejected}
-            />
-          )}
-          {tab === "whatif" && <WhatIfTab scores={scores} deductions={deductions} />}
-          {tab === "activity" && <ActivityTab scores={scores} />}
-          {tab === "backup" && (
-            <BackupTab
-              state={state}
-              pin={pin}
-              onStateUpdated={setState}
-              onPinRejected={handlePinRejected}
-            />
-          )}
-          {tab === "seasons" && (
-            <SeasonsTab
-              state={state}
-              pin={pin}
-              onStateUpdated={setState}
-              onPinRejected={handlePinRejected}
-            />
-          )}
+          <LeagueTable rows={table} onSelectPlayer={openProfile} />
+          <DeductionsPanel
+            players={league.players}
+            deductions={deductions}
+            slug={slug}
+            code={code}
+            onLeagueUpdated={setLeague}
+            onCodeRejected={handleCodeRejected}
+          />
         </>
+      )}
+      {tab === "fixtures" && (
+        <Fixtures
+          view={view}
+          scores={scores}
+          slug={slug}
+          code={code}
+          onLeagueUpdated={setLeague}
+          onCodeRejected={handleCodeRejected}
+        />
+      )}
+      {tab === "scorers" && <TopScorers rows={scorers} />}
+      {tab === "cleansheets" && <CleanSheets rows={cleanSheets} />}
+      {tab === "players" && (
+        <PlayersTab
+          view={view}
+          scores={scores}
+          deductions={deductions}
+          selected={selectedPlayer}
+          onSelect={setSelectedPlayer}
+        />
+      )}
+      {tab === "h2h" && <HeadToHeadTab view={view} scores={scores} />}
+      {tab === "deadline" && (
+        <DeadlineTab
+          view={view}
+          scores={scores}
+          window={league.window}
+          slug={slug}
+          code={code}
+          onLeagueUpdated={setLeague}
+          onCodeRejected={handleCodeRejected}
+        />
+      )}
+      {tab === "whatif" && <WhatIfTab view={view} scores={scores} deductions={deductions} />}
+      {tab === "activity" && <ActivityTab view={view} scores={scores} />}
+      {tab === "halloffame" && <HallOfFameTab league={league} />}
+      {tab === "seasons" && (
+        <SeasonsTab
+          league={league}
+          view={view}
+          slug={slug}
+          code={code}
+          onLeagueUpdated={setLeague}
+          onCodeRejected={handleCodeRejected}
+        />
+      )}
+      {tab === "roster" && (
+        <RosterTab
+          league={league}
+          slug={slug}
+          code={code}
+          onLeagueUpdated={setLeague}
+          onCodeRejected={handleCodeRejected}
+        />
+      )}
+      {tab === "backup" && (
+        <BackupTab
+          league={league}
+          view={view}
+          slug={slug}
+          code={code}
+          onLeagueUpdated={setLeague}
+          onCodeRejected={handleCodeRejected}
+        />
       )}
 
       <footer className="footer">
@@ -256,13 +282,17 @@ export default function LeagueApp() {
   );
 }
 
+/* ------------------------------------------------------------ admin unlock */
+
 function AdminControl({
-  pin,
+  slug,
+  code,
   onUnlock,
   onLock,
 }: {
-  pin: string | null;
-  onUnlock: (pin: string) => void;
+  slug: string;
+  code: string | null;
+  onUnlock: (code: string) => void;
   onLock: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -270,9 +300,9 @@ function AdminControl({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (pin) {
+  if (code) {
     return (
-      <button className="admin-btn unlocked" onClick={onLock} title="Lock score editing">
+      <button className="admin-btn unlocked" onClick={onLock} title="Lock editing">
         🔓 Editing on — Lock
       </button>
     );
@@ -283,17 +313,17 @@ function AdminControl({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/auth", {
+      const res = await fetch(`/api/leagues/${slug}/auth`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: value.trim() }),
+        body: JSON.stringify({ code: value.trim() }),
       });
       if (res.ok) {
         onUnlock(value.trim());
         setOpen(false);
         setValue("");
       } else {
-        setError("Wrong PIN");
+        setError("Wrong code");
       }
     } catch {
       setError("Network error");
@@ -312,12 +342,11 @@ function AdminControl({
     >
       <input
         type="password"
-        inputMode="numeric"
         autoFocus
-        placeholder="Secret PIN"
+        placeholder="Admin code"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        aria-label="Secret PIN"
+        aria-label="Admin code"
       />
       <button type="submit" disabled={busy}>
         {busy ? "…" : "Unlock"}
@@ -337,10 +366,12 @@ function AdminControl({
     </form>
   ) : (
     <button className="admin-btn" onClick={() => setOpen(true)}>
-      🔒 Update scores
+      🔒 Admin
     </button>
   );
 }
+
+/* ------------------------------------------------------------------ table */
 
 function FormPips({ form }: { form: FormEntry[] }) {
   if (form.length === 0) return <span className="form-empty">—</span>;
@@ -366,6 +397,13 @@ function LeagueTable({
   rows: ReturnType<typeof computeTable>;
   onSelectPlayer: (player: string) => void;
 }) {
+  if (rows.length === 0) {
+    return (
+      <section className="card">
+        <p className="muted">No players yet.</p>
+      </section>
+    );
+  }
   return (
     <section className="card">
       <div className="table-scroll">
@@ -425,44 +463,54 @@ function LeagueTable({
   );
 }
 
+/* ------------------------------------------------------------- deductions */
+
 function DeductionsPanel({
+  players,
   deductions,
-  pin,
-  onStateUpdated,
-  onPinRejected,
+  slug,
+  code,
+  onLeagueUpdated,
+  onCodeRejected,
 }: {
+  players: string[];
   deductions: Deduction[];
-  pin: string | null;
-  onStateUpdated: (state: LeagueState) => void;
-  onPinRejected: () => void;
+  slug: string;
+  code: string | null;
+  onLeagueUpdated: (league: PublicLeague) => void;
+  onCodeRejected: () => void;
 }) {
-  const [player, setPlayer] = useState(PLAYERS[0]);
+  const [player, setPlayer] = useState(players[0] ?? "");
   const [points, setPoints] = useState("3");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!players.includes(player)) setPlayer(players[0] ?? "");
+  }, [players, player]);
+
   const send = async (payload: Record<string, unknown>) => {
-    if (busy || !pin) return;
+    if (busy || !code) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/deductions", {
+      const res = await fetch(`/api/leagues/${slug}/deductions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin, ...payload }),
+        body: JSON.stringify({ code, ...payload }),
       });
       const data = await res.json();
       if (res.status === 401) {
-        setError("PIN no longer valid — unlock again");
-        onPinRejected();
+        setError("Code no longer valid — unlock again");
+        onCodeRejected();
         return;
       }
       if (!res.ok) {
         setError(data.error ?? "Save failed");
         return;
       }
-      onStateUpdated(data as LeagueState);
+      onLeagueUpdated(data.league as PublicLeague);
       setReason("");
     } catch {
       setError("Network error — try again");
@@ -471,7 +519,7 @@ function DeductionsPanel({
     }
   };
 
-  if (!pin && deductions.length === 0) return null;
+  if (!code && deductions.length === 0) return null;
 
   return (
     <section className="card deductions">
@@ -485,7 +533,7 @@ function DeductionsPanel({
               <span className="ded-player">{d.player}</span>
               <span className="ded-points">−{d.points} pts</span>
               <span className="ded-reason">{d.reason || "no reason given"}</span>
-              {pin && (
+              {code && (
                 <button className="mini danger" onClick={() => send({ id: d.id })} disabled={busy}>
                   Undo
                 </button>
@@ -495,7 +543,7 @@ function DeductionsPanel({
         </ul>
       )}
 
-      {pin && (
+      {code && players.length > 0 && (
         <form
           className="ded-form"
           onSubmit={(e) => {
@@ -504,7 +552,7 @@ function DeductionsPanel({
           }}
         >
           <select value={player} onChange={(e) => setPlayer(e.target.value)} aria-label="Player">
-            {PLAYERS.map((p) => (
+            {players.map((p) => (
               <option key={p} value={p}>
                 {p}
               </option>
@@ -534,6 +582,8 @@ function DeductionsPanel({
     </section>
   );
 }
+
+/* ----------------------------------------------------------------- stats */
 
 function TopScorers({ rows }: { rows: ReturnType<typeof computeTopScorers> }) {
   const max = Math.max(1, ...rows.map((r) => r.goals));
@@ -592,32 +642,47 @@ function CleanSheets({ rows }: { rows: ReturnType<typeof computeCleanSheets> }) 
   );
 }
 
+/* -------------------------------------------------------------- fixtures */
+
 function Fixtures({
+  view,
   scores,
-  pin,
-  onStateUpdated,
-  onPinRejected,
+  slug,
+  code,
+  onLeagueUpdated,
+  onCodeRejected,
 }: {
+  view: LeagueView;
   scores: Scores;
-  pin: string | null;
-  onStateUpdated: (state: LeagueState) => void;
-  onPinRejected: () => void;
+  slug: string;
+  code: string | null;
+  onLeagueUpdated: (league: PublicLeague) => void;
+  onCodeRejected: () => void;
 }) {
   const firstUnfinished = useMemo(() => {
-    for (const md of MATCHDAYS) {
+    for (const md of view.matchdays) {
       if (md.matches.some((m) => !scores[m.id])) return md.matchday;
     }
-    return MATCHDAYS.length;
-  }, [scores]);
+    return view.matchdays.length;
+  }, [scores, view.matchdays]);
 
   const [selected, setSelected] = useState<number>(firstUnfinished);
 
-  const matchday = MATCHDAYS.find((md) => md.matchday === selected) ?? MATCHDAYS[0];
+  if (view.matchdays.length === 0) {
+    return (
+      <section className="card">
+        <p className="muted">No fixtures yet.</p>
+      </section>
+    );
+  }
+
+  const matchday =
+    view.matchdays.find((md) => md.matchday === selected) ?? view.matchdays[0];
 
   return (
     <section>
       <div className="md-picker" role="tablist" aria-label="Matchdays">
-        {MATCHDAYS.map((md) => {
+        {view.matchdays.map((md) => {
           const done = md.matches.every((m) => scores[m.id]);
           const partial = !done && md.matches.some((m) => scores[m.id]);
           return (
@@ -647,9 +712,10 @@ function Fixtures({
               key={m.id}
               match={m}
               score={scores[m.id]}
-              pin={pin}
-              onStateUpdated={onStateUpdated}
-              onPinRejected={onPinRejected}
+              slug={slug}
+              code={code}
+              onLeagueUpdated={onLeagueUpdated}
+              onCodeRejected={onCodeRejected}
             />
           ))}
         </ul>
@@ -661,15 +727,17 @@ function Fixtures({
 function MatchRow({
   match,
   score,
-  pin,
-  onStateUpdated,
-  onPinRejected,
+  slug,
+  code,
+  onLeagueUpdated,
+  onCodeRejected,
 }: {
   match: Match;
   score?: Score;
-  pin: string | null;
-  onStateUpdated: (state: LeagueState) => void;
-  onPinRejected: () => void;
+  slug: string;
+  code: string | null;
+  onLeagueUpdated: (league: PublicLeague) => void;
+  onCodeRejected: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [homeVal, setHomeVal] = useState("");
@@ -685,26 +753,26 @@ function MatchRow({
   };
 
   const send = async (payload: Record<string, unknown>) => {
-    if (busy || !pin) return;
+    if (busy || !code) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/scores", {
+      const res = await fetch(`/api/leagues/${slug}/scores`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin, matchId: match.id, ...payload }),
+        body: JSON.stringify({ code, matchId: match.id, ...payload }),
       });
       const data = await res.json();
       if (res.status === 401) {
-        setError("PIN no longer valid — unlock again");
-        onPinRejected();
+        setError("Code no longer valid — unlock again");
+        onCodeRejected();
         return;
       }
       if (!res.ok) {
         setError(data.error ?? "Save failed");
         return;
       }
-      onStateUpdated(data as LeagueState);
+      onLeagueUpdated(data.league as PublicLeague);
       setEditing(false);
     } catch {
       setError("Network error — try again");
@@ -721,16 +789,12 @@ function MatchRow({
     send({ home: Number(homeVal), away: Number(awayVal) });
   };
 
-  const display = score
-    ? score.noShow
-      ? "No show"
-      : `${score.home} – ${score.away}`
-    : "vs";
+  const display = score ? (score.noShow ? "No show" : `${score.home} – ${score.away}`) : "vs";
 
   return (
     <li className={score ? (score.noShow ? "match noshow" : "match played") : "match"}>
       <span className="side home">{match.home}</span>
-      {editing && pin ? (
+      {editing && code ? (
         <span className="score-edit">
           <input
             type="number"
@@ -759,7 +823,7 @@ function MatchRow({
       )}
       <span className="side away">{match.away}</span>
 
-      {pin && (
+      {code && (
         <span className="row-actions">
           {editing ? (
             <>
