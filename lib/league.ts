@@ -1,5 +1,3 @@
-import fixturesData from "./fixtures.json";
-
 export interface Match {
   id: string;
   matchday: number;
@@ -69,6 +67,7 @@ export interface ArchivedSeason {
   endedAt: string;
 }
 
+/** The live, editable part of a league. */
 export interface LeagueState {
   scores: Scores;
   deductions: Deduction[];
@@ -124,28 +123,47 @@ export interface CleanSheetRow {
 /** Number of recent matches shown in the table's form column. */
 export const FORM_LENGTH = 3;
 
-export const MATCHDAYS: Matchday[] = (
-  fixturesData as {
-    matchday: number;
-    resting: string | null;
-    matches: { home: string; away: string }[];
-  }[]
-).map((md) => ({
-  matchday: md.matchday,
-  resting: md.resting,
-  matches: md.matches.map((m, i) => ({
-    id: `${md.matchday}-${i + 1}`,
-    matchday: md.matchday,
-    home: m.home,
-    away: m.away,
-  })),
-}));
+/**
+ * Everything the UI and stats need about one league's schedule. Built from a
+ * league's stored fixtures rather than a file, so each league has its own.
+ */
+export interface LeagueView {
+  players: string[];
+  matchdays: Matchday[];
+  allMatches: Match[];
+  matchById: Map<string, Match>;
+}
 
-export const ALL_MATCHES: Match[] = MATCHDAYS.flatMap((md) => md.matches);
+export function buildView(players: string[], fixtures: Match[]): LeagueView {
+  const byMatchday = new Map<number, Match[]>();
+  for (const f of fixtures) {
+    const list = byMatchday.get(f.matchday) ?? [];
+    list.push(f);
+    byMatchday.set(f.matchday, list);
+  }
+  const matchdays: Matchday[] = [...byMatchday.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([matchday, matches]) => {
+      const busy = new Set(matches.flatMap((m) => [m.home, m.away]));
+      const resting = players.find((p) => !busy.has(p)) ?? null;
+      return { matchday, resting, matches };
+    });
 
-export const MATCH_BY_ID: Map<string, Match> = new Map(ALL_MATCHES.map((m) => [m.id, m]));
+  const allMatches = matchdays.flatMap((md) => md.matches);
+  return {
+    players: [...players].sort((a, b) => a.localeCompare(b)),
+    matchdays,
+    allMatches,
+    matchById: new Map(allMatches.map((m) => [m.id, m])),
+  };
+}
 
-export const PLAYERS: string[] = [...new Set(ALL_MATCHES.flatMap((m) => [m.home, m.away]))].sort();
+export const EMPTY_VIEW: LeagueView = {
+  players: [],
+  matchdays: [],
+  allMatches: [],
+  matchById: new Map(),
+};
 
 export function isValidScore(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 99;
@@ -157,9 +175,9 @@ function countsForStats(score: Score | undefined): score is Score {
 }
 
 /** Resolve the current season's stored scores into name-bearing results. */
-export function resolveMatches(scores: Scores): ResolvedMatch[] {
+export function resolveMatches(view: LeagueView, scores: Scores): ResolvedMatch[] {
   const out: ResolvedMatch[] = [];
-  for (const match of ALL_MATCHES) {
+  for (const match of view.allMatches) {
     const score = scores[match.id];
     if (!score) continue;
     out.push({
@@ -282,8 +300,12 @@ export function tableFrom(
   );
 }
 
-export function computeTable(scores: Scores, deductions: Deduction[] = []): TableRow[] {
-  return tableFrom(PLAYERS, resolveMatches(scores), deductions);
+export function computeTable(
+  view: LeagueView,
+  scores: Scores,
+  deductions: Deduction[] = []
+): TableRow[] {
+  return tableFrom(view.players, resolveMatches(view, scores), deductions);
 }
 
 export function scorersFrom(players: string[], results: ResolvedMatch[]): ScorerRow[] {
@@ -305,8 +327,8 @@ export function scorersFrom(players: string[], results: ResolvedMatch[]): Scorer
   );
 }
 
-export function computeTopScorers(scores: Scores): ScorerRow[] {
-  return scorersFrom(PLAYERS, resolveMatches(scores));
+export function computeTopScorers(view: LeagueView, scores: Scores): ScorerRow[] {
+  return scorersFrom(view.players, resolveMatches(view, scores));
 }
 
 export interface PlayerMatch {
@@ -389,9 +411,9 @@ function addToSplit(split: SplitStats, m: PlayerMatch): void {
 }
 
 /** Every fixture involving a player, in matchday order, played or not. */
-export function playerMatches(player: string, scores: Scores): PlayerMatch[] {
+export function playerMatches(view: LeagueView, player: string, scores: Scores): PlayerMatch[] {
   const out: PlayerMatch[] = [];
-  for (const match of ALL_MATCHES) {
+  for (const match of view.allMatches) {
     if (match.home !== player && match.away !== player) continue;
     const isHome = match.home === player;
     const score = scores[match.id];
@@ -419,15 +441,16 @@ export function playerMatches(player: string, scores: Scores): PlayerMatch[] {
 }
 
 export function computePlayerProfile(
+  view: LeagueView,
   player: string,
   scores: Scores,
   deductions: Deduction[] = []
 ): PlayerProfile {
-  const table = computeTable(scores, deductions);
+  const table = computeTable(view, scores, deductions);
   const position = table.findIndex((r) => r.player === player) + 1;
   const row = table.find((r) => r.player === player)!;
 
-  const matches = playerMatches(player, scores);
+  const matches = playerMatches(view, player, scores);
   const played = matches.filter((m) => scores[m.matchId] && !m.noShow);
   const upcoming = matches.filter((m) => !scores[m.matchId]);
 
@@ -479,8 +502,13 @@ export function computePlayerProfile(
   };
 }
 
-export function computeHeadToHead(a: string, b: string, scores: Scores): HeadToHead {
-  const matches = playerMatches(a, scores).filter((m) => m.opponent === b);
+export function computeHeadToHead(
+  view: LeagueView,
+  a: string,
+  b: string,
+  scores: Scores
+): HeadToHead {
+  const matches = playerMatches(view, a, scores).filter((m) => m.opponent === b);
   const h2h: HeadToHead = {
     a,
     b,
@@ -533,27 +561,28 @@ export function cleanSheetsFrom(players: string[], results: ResolvedMatch[]): Cl
   );
 }
 
-export function computeCleanSheets(scores: Scores): CleanSheetRow[] {
-  return cleanSheetsFrom(PLAYERS, resolveMatches(scores));
+export function computeCleanSheets(view: LeagueView, scores: Scores): CleanSheetRow[] {
+  return cleanSheetsFrom(view.players, resolveMatches(view, scores));
 }
 
 /** Every fixture has a recorded outcome — the precondition for a new season. */
-export function isSeasonComplete(scores: Scores): boolean {
-  return ALL_MATCHES.every((m) => Boolean(scores[m.id]));
+export function isSeasonComplete(view: LeagueView, scores: Scores): boolean {
+  return view.allMatches.length > 0 && view.allMatches.every((m) => Boolean(scores[m.id]));
 }
 
 /** Snapshot the live season so it can be stored in `seasons`. */
 export function archiveCurrentSeason(
-  state: LeagueState,
+  view: LeagueView,
+  state: { scores: Scores; deductions: Deduction[] },
   number: number,
   name?: string
 ): ArchivedSeason {
-  const results = resolveMatches(state.scores);
+  const results = resolveMatches(view, state.scores);
   return {
     id: `season-${number}-${Date.now()}`,
     number,
     name: name?.trim() || `Season ${number}`,
-    players: PLAYERS,
+    players: view.players,
     results,
     deductions: state.deductions,
     endedAt: new Date().toISOString(),
@@ -584,38 +613,47 @@ export interface WindowStatus {
 
 /** The matchdays covered by a window, clamped to the season length. */
 /** How many matchdays a window covers, clamped to something sensible. */
-export function windowSize(window: LeagueWindow | null | undefined): number {
+export function windowSize(
+  view: LeagueView,
+  window: LeagueWindow | null | undefined
+): number {
+  const total = view.matchdays.length || DEFAULT_WINDOW_MATCHDAYS;
   const raw = window?.matchdays ?? DEFAULT_WINDOW_MATCHDAYS;
-  if (!Number.isInteger(raw) || raw < 1) return DEFAULT_WINDOW_MATCHDAYS;
-  return Math.min(raw, MATCHDAYS.length);
+  if (!Number.isInteger(raw) || raw < 1) return Math.min(DEFAULT_WINDOW_MATCHDAYS, total);
+  return Math.min(raw, total);
 }
 
-export function windowMatchdays(window: LeagueWindow | null | undefined): number[] {
+export function windowMatchdays(
+  view: LeagueView,
+  window: LeagueWindow | null | undefined
+): number[] {
   if (!window) return [];
   const out: number[] = [];
-  const size = windowSize(window);
+  const size = windowSize(view, window);
+  const total = view.matchdays.length;
   for (let i = 0; i < size; i++) {
     const md = window.firstMatchday + i;
-    if (md >= 1 && md <= MATCHDAYS.length) out.push(md);
+    if (md >= 1 && md <= total) out.push(md);
   }
   return out;
 }
 
 /** First matchday that still has unplayed fixtures — the natural next window. */
-export function suggestedWindowStart(scores: Scores): number {
-  for (const md of MATCHDAYS) {
+export function suggestedWindowStart(view: LeagueView, scores: Scores): number {
+  for (const md of view.matchdays) {
     if (md.matches.some((m) => !scores[m.id])) return md.matchday;
   }
-  return MATCHDAYS.length;
+  return view.matchdays.length || 1;
 }
 
 export function computeWindowStatus(
+  view: LeagueView,
   scores: Scores,
   window: LeagueWindow | null | undefined,
   now: number = Date.now()
 ): WindowStatus {
-  const mds = windowMatchdays(window);
-  const matches = ALL_MATCHES.filter((m) => mds.includes(m.matchday));
+  const mds = windowMatchdays(view, window);
+  const matches = view.allMatches.filter((m) => mds.includes(m.matchday));
   const pending = matches.filter((m) => !scores[m.id]);
 
   const deadlineMs = window ? new Date(window.startedAt).getTime() + WINDOW_HOURS * 3600_000 : null;
@@ -676,13 +714,14 @@ export interface ProjectedRow extends TableRow {
 }
 
 export function computeProjection(
+  view: LeagueView,
   scores: Scores,
   hypo: Hypotheticals,
   deductions: Deduction[] = []
 ): ProjectedRow[] {
-  const current = computeTable(scores, deductions);
+  const current = computeTable(view, scores, deductions);
   const positions = new Map(current.map((r, i) => [r.player, i + 1]));
-  const projected = computeTable(applyHypotheticals(scores, hypo), deductions);
+  const projected = computeTable(view, applyHypotheticals(scores, hypo), deductions);
   return projected.map((row, i) => {
     const currentPosition = positions.get(row.player) ?? i + 1;
     return { ...row, currentPosition, movement: currentPosition - (i + 1) };
@@ -708,9 +747,9 @@ export interface ActivityEntry {
  * Newest results first. Entries recorded before timestamps were tracked have no
  * `at` value and are listed after the timestamped ones, latest matchday first.
  */
-export function computeActivity(scores: Scores): ActivityEntry[] {
+export function computeActivity(view: LeagueView, scores: Scores): ActivityEntry[] {
   const entries: ActivityEntry[] = [];
-  for (const match of ALL_MATCHES) {
+  for (const match of view.allMatches) {
     const score = scores[match.id];
     if (!score) continue;
     entries.push({
@@ -734,9 +773,9 @@ export function computeActivity(scores: Scores): ActivityEntry[] {
 }
 
 /** Full season as CSV, for the export/backup tab. */
-export function toCsv(scores: Scores): string {
+export function toCsv(view: LeagueView, scores: Scores): string {
   const rows = [["matchday", "home", "away", "home_goals", "away_goals", "no_show", "recorded_at"]];
-  for (const match of ALL_MATCHES) {
+  for (const match of view.allMatches) {
     const score = scores[match.id];
     rows.push([
       String(match.matchday),
