@@ -14,7 +14,9 @@ own page at `/l/<slug>`.
 - **Top scorers** and **clean sheets** — players ranked by goals and by shutouts.
 - **Player profiles** — position, form, home/away split, biggest win/loss, full
   results and remaining fixtures. Names in the table link straight to them.
-- **Head to head** — both meetings between any two players, with aggregate record.
+- **Head to head** — every meeting between two players across all seasons: the
+  all-time record, a per-season breakdown, and each result grouped by season.
+  Players who have left the league can still be picked.
 - **Deadline tracker** — rule 5's 48-hour play window: recorders choose how many
   matchdays it covers (default 6) and can resize a running window without
   restarting its countdown. Shows the countdown, an overdue state, outstanding

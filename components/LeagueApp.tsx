@@ -229,7 +229,7 @@ export default function LeagueApp({ slug, showDirectoryLink = true }: { slug: st
           onSelect={setSelectedPlayer}
         />
       )}
-      {tab === "h2h" && <HeadToHeadTab view={view} scores={scores} />}
+      {tab === "h2h" && <HeadToHeadTab league={league} view={view} />}
       {tab === "deadline" && (
         <DeadlineTab
           view={view}

@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import {
-  computeHeadToHead,
   computePlayerProfile,
   type Deduction,
   type FormResult,
@@ -12,6 +11,7 @@ import {
   type Scores,
   type SplitStats,
 } from "@/lib/league";
+import { computeHeadToHeadAllTime, type PublicLeague } from "@/lib/leagues";
 
 function ResultPip({ result, title }: { result: FormResult; title?: string }) {
   return (
@@ -265,19 +265,48 @@ export function PlayersTab({
   );
 }
 
-export function HeadToHeadTab({ view, scores }: { view: LeagueView; scores: Scores }) {
-  const players = view.players;
+export function HeadToHeadTab({
+  league,
+  view,
+}: {
+  league: PublicLeague;
+  view: LeagueView;
+}) {
+  const players = useMemo(() => {
+    // Anyone who has ever played in this league, not just the current roster.
+    const all = new Set<string>(view.players);
+    for (const season of league.seasons ?? []) for (const p of season.players) all.add(p);
+    return [...all].sort((x, y) => x.localeCompare(y));
+  }, [view.players, league.seasons]);
+
   const [a, setA] = useState(players[0] ?? "");
   const [b, setB] = useState(players[1] ?? "");
 
-  const h2h = useMemo(() => computeHeadToHead(view, a, b, scores), [view, a, b, scores]);
+  const h2h = useMemo(() => computeHeadToHeadAllTime(league, a, b), [league, a, b]);
+
   const samePlayer = a === b;
   const notEnough = players.length < 2;
-
   const swap = () => {
     setA(b);
     setB(a);
   };
+
+  // Newest first: the live season, then archived seasons in reverse order.
+  const grouped = useMemo(() => {
+    const map = new Map<string, typeof h2h.meetings>();
+    for (const m of h2h.meetings) {
+      const key = `${m.live ? "live" : "arch"}-${m.seasonNumber}-${m.seasonLabel}`;
+      map.set(key, [...(map.get(key) ?? []), m]);
+    }
+    return [...map.entries()].sort((x, y) => {
+      const [, mx] = x;
+      const [, my] = y;
+      if (mx[0].live !== my[0].live) return mx[0].live ? -1 : 1;
+      return my[0].seasonNumber - mx[0].seasonNumber;
+    });
+  }, [h2h.meetings]);
+
+  const currentRoster = new Set(view.players);
 
   return (
     <section className="card">
@@ -288,6 +317,7 @@ export function HeadToHeadTab({ view, scores }: { view: LeagueView; scores: Scor
           {players.map((p) => (
             <option key={p} value={p}>
               {p}
+              {currentRoster.has(p) ? "" : " (past player)"}
             </option>
           ))}
         </select>
@@ -298,6 +328,7 @@ export function HeadToHeadTab({ view, scores }: { view: LeagueView; scores: Scor
           {players.map((p) => (
             <option key={p} value={p}>
               {p}
+              {currentRoster.has(p) ? "" : " (past player)"}
             </option>
           ))}
         </select>
@@ -337,40 +368,68 @@ export function HeadToHeadTab({ view, scores }: { view: LeagueView; scores: Scor
           </div>
 
           <p className="muted h2h-goals">
-            {h2h.played} of {h2h.matches.length} meetings played · goals {h2h.aGoals}–{h2h.bGoals}
+            All time · {h2h.played} of {h2h.scheduled} meetings played · goals {h2h.aGoals}–
+            {h2h.bGoals}
           </p>
 
-          <ul className="pm-list h2h-list">
-            {h2h.matches.map((m) => (
-              <li key={m.matchId} className="pm-row">
-                <span className="pm-md">MD{m.matchday}</span>
-                <span className="pm-opp">
-                  {m.home ? a : b} <span className="muted">vs</span> {m.home ? b : a}
-                </span>
-                <span className="pm-score">
-                  {m.noShow
-                    ? "no show"
-                    : m.result === "N"
-                      ? "not played"
-                      : m.home
-                        ? `${m.goalsFor}–${m.goalsAgainst}`
-                        : `${m.goalsAgainst}–${m.goalsFor}`}
-                </span>
-                {m.result !== "N" && !m.noShow ? (
-                  <ResultPip result={m.result} title={`${a}'s result`} />
-                ) : (
-                  <span className="pip pip-N">·</span>
-                )}
-              </li>
-            ))}
-          </ul>
-
-          {h2h.played === h2h.matches.length && h2h.aWins === h2h.bWins && h2h.played > 0 && (
-            <p className="muted decider-note">
-              Dead even. If these two finish level on points, goal difference, goals scored and
-              wins, rule 1 says they play one game to decide it.
-            </p>
+          {h2h.bySeason.length > 1 && (
+            <ul className="h2h-splits">
+              {[...h2h.bySeason].reverse().map((sp) => (
+                <li key={`${sp.seasonNumber}-${sp.live}`}>
+                  <span className="h2h-split-name">
+                    {sp.seasonLabel}
+                    {sp.live && <span className="live-dot"> live</span>}
+                  </span>
+                  <span className="h2h-split-record">
+                    {sp.aWins}–{sp.draws}–{sp.bWins}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
+
+          {grouped.map(([key, meetings]) => (
+            <div key={key} className="h2h-season-block">
+              <h4 className="sub-head">
+                {meetings[0].seasonLabel}
+                {meetings[0].live ? " (live)" : ""}
+              </h4>
+              <ul className="pm-list h2h-list">
+                {meetings.map((m, i) => {
+                  const aIsHome = m.home === a;
+                  const aGoals = aIsHome ? m.homeGoals : m.awayGoals;
+                  const bGoals = aIsHome ? m.awayGoals : m.homeGoals;
+                  const result =
+                    !m.played || m.noShow ? null : aGoals > bGoals ? "W" : aGoals < bGoals ? "L" : "D";
+                  return (
+                    <li key={`${key}-${i}`} className="pm-row">
+                      <span className="pm-md">MD{m.matchday}</span>
+                      <span className="pm-opp">
+                        {m.home} <span className="muted">vs</span> {m.away}
+                      </span>
+                      <span className="pm-score">
+                        {m.noShow
+                          ? "no show"
+                          : !m.played
+                            ? "not played"
+                            : `${m.homeGoals}–${m.awayGoals}`}
+                      </span>
+                      {result ? (
+                        <ResultPip result={result} title={`${a}'s result`} />
+                      ) : (
+                        <span className="pip pip-N">·</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+
+          {h2h.scheduled === 0 && (
+            <p className="muted">These two have never been scheduled against each other.</p>
+          )}
+
         </>
       )}
     </section>
