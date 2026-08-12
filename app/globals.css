@@ -1807,3 +1807,44 @@ body {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+.h2h-splits {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.h2h-splits li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 2px;
+  font-size: 0.85rem;
+}
+
+.h2h-split-name {
+  color: var(--text-dim);
+}
+
+.live-dot {
+  color: var(--accent);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.h2h-split-record {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.h2h-season-block .sub-head {
+  margin-top: 14px;
+}
+
+.h2h-season-block .h2h-list {
+  border-top: none;
+  padding-top: 0;
+}
