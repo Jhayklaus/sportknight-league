@@ -430,12 +430,6 @@ export function HeadToHeadTab({
             <p className="muted">These two have never been scheduled against each other.</p>
           )}
 
-          {h2h.played > 0 && h2h.aWins === h2h.bWins && (
-            <p className="muted decider-note">
-              Dead even all time. If these two finish level on points, goal difference, goals
-              scored and wins, rule 1 says they play one game to decide it.
-            </p>
-          )}
         </>
       )}
     </section>

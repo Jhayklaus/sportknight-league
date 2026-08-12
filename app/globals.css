@@ -1081,13 +1081,6 @@ body {
   padding-top: 6px;
 }
 
-.decider-note {
-  margin-top: 12px;
-  padding: 10px 12px;
-  border: 1px dashed var(--gold);
-  border-radius: 8px;
-  color: var(--gold);
-}
 
 /* ---------- deadline tracker ---------- */
 
