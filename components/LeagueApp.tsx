@@ -21,6 +21,7 @@ import { ActivityTab, BackupTab, DeadlineTab, WhatIfTab } from "./LeagueTools";
 import { SeasonsTab } from "./SeasonsTab";
 import { HallOfFameTab } from "./HallOfFame";
 import { RosterTab } from "./RosterTab";
+import { DraftTab } from "./DraftTab";
 
 type Tab =
   | "table"
@@ -35,9 +36,10 @@ type Tab =
   | "halloffame"
   | "seasons"
   | "roster"
-  | "backup";
+  | "backup"
+  | "draft";
 
-const TABS: [Tab, string][] = [
+const BASE_TABS: [Tab, string][] = [
   ["table", "Table"],
   ["fixtures", "Fixtures & Results"],
   ["scorers", "Top Scorers"],
@@ -138,6 +140,12 @@ export default function LeagueApp({ slug, showDirectoryLink = true }: { slug: st
     );
   }
 
+  // The draft is a temporary tournament tool, so only show it when it applies.
+  const showDraft = Boolean(league.draft) || Boolean(code);
+  const tabs: [Tab, string][] = showDraft
+    ? [...BASE_TABS, ["draft", "Draft"] as [Tab, string]]
+    : BASE_TABS;
+
   const playedCount = Object.values(scores).filter((s) => !s.noShow).length;
   const noShowCount = Object.values(scores).filter((s) => s.noShow).length;
   const total = view.allMatches.length;
@@ -175,7 +183,7 @@ export default function LeagueApp({ slug, showDirectoryLink = true }: { slug: st
           )}
         </p>
         <nav className="tabs" aria-label="Sections">
-          {TABS.map(([key, label]) => (
+          {tabs.map(([key, label]) => (
             <button
               key={key}
               className={tab === key ? "tab active" : "tab"}
@@ -256,6 +264,15 @@ export default function LeagueApp({ slug, showDirectoryLink = true }: { slug: st
       )}
       {tab === "roster" && (
         <RosterTab
+          league={league}
+          slug={slug}
+          code={code}
+          onLeagueUpdated={setLeague}
+          onCodeRejected={handleCodeRejected}
+        />
+      )}
+      {tab === "draft" && (
+        <DraftTab
           league={league}
           slug={slug}
           code={code}
