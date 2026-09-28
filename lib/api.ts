@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkLeagueCode } from "./auth";
 import { loadLeague } from "./store";
+import { sanitiseDraft } from "./draft";
 import type { LeagueRecord } from "./leagues";
 
 export const STORAGE_ERROR =
@@ -46,4 +47,17 @@ export async function authorise(
 export function serverError(err: unknown, context: string): NextResponse {
   console.error(`${context}:`, err);
   return NextResponse.json({ error: STORAGE_ERROR }, { status: 500 });
+}
+
+/**
+ * The league as the browser may see it: no admin credentials, no invite codes,
+ * no other people's device tokens. Every public payload goes through this.
+ */
+export function toPublicLeague(league: LeagueRecord) {
+  const { auth, draft, ...rest } = league;
+  return {
+    ...rest,
+    draft: draft ? sanitiseDraft(draft) : draft ?? null,
+    hasCustomCode: auth !== null,
+  };
 }

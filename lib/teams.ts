@@ -1,8 +1,9 @@
 /**
- * First-division clubs of the top five European leagues, for the draft.
+ * The draft pool: the strongest ten clubs from four of Europe's top leagues.
  *
- * Kept as plain data so it is easy to correct after promotions and
- * relegations, or to trim to the clubs your game actually licenses.
+ * Bundesliga is left out because eFootball's coverage of it is thin, and each
+ * league is trimmed to ten so every entrant draws a competitive side. These are
+ * plain lists — edit them freely as clubs rise, fall, or lose their licence.
  */
 
 export interface Competition {
@@ -20,24 +21,14 @@ export const COMPETITIONS: Competition[] = [
     teams: [
       "Arsenal",
       "Aston Villa",
-      "Bournemouth",
-      "Brentford",
       "Brighton & Hove Albion",
-      "Burnley",
       "Chelsea",
-      "Crystal Palace",
-      "Everton",
-      "Fulham",
-      "Leeds United",
       "Liverpool",
       "Manchester City",
       "Manchester United",
       "Newcastle United",
       "Nottingham Forest",
-      "Sunderland",
       "Tottenham Hotspur",
-      "West Ham United",
-      "Wolverhampton Wanderers",
     ],
   },
   {
@@ -45,22 +36,12 @@ export const COMPETITIONS: Competition[] = [
     name: "LaLiga",
     country: "Spain",
     teams: [
-      "Alaves",
       "Athletic Club",
       "Atletico Madrid",
       "Barcelona",
       "Celta Vigo",
-      "Elche",
-      "Espanyol",
-      "Getafe",
-      "Girona",
-      "Levante",
-      "Mallorca",
-      "Osasuna",
-      "Rayo Vallecano",
       "Real Betis",
       "Real Madrid",
-      "Real Oviedo",
       "Real Sociedad",
       "Sevilla",
       "Valencia",
@@ -75,48 +56,13 @@ export const COMPETITIONS: Competition[] = [
       "AC Milan",
       "Atalanta",
       "Bologna",
-      "Cagliari",
-      "Como",
-      "Cremonese",
       "Fiorentina",
-      "Genoa",
-      "Hellas Verona",
       "Inter Milan",
       "Juventus",
       "Lazio",
-      "Lecce",
       "Napoli",
-      "Parma",
-      "Pisa",
       "Roma",
-      "Sassuolo",
       "Torino",
-      "Udinese",
-    ],
-  },
-  {
-    id: "bundesliga",
-    name: "Bundesliga",
-    country: "Germany",
-    teams: [
-      "Augsburg",
-      "Bayer Leverkusen",
-      "Bayern Munich",
-      "Borussia Dortmund",
-      "Borussia Monchengladbach",
-      "Eintracht Frankfurt",
-      "FC Koln",
-      "Freiburg",
-      "Hamburger SV",
-      "Heidenheim",
-      "Hoffenheim",
-      "Mainz 05",
-      "RB Leipzig",
-      "St. Pauli",
-      "Stuttgart",
-      "Union Berlin",
-      "Werder Bremen",
-      "Wolfsburg",
     ],
   },
   {
@@ -124,24 +70,16 @@ export const COMPETITIONS: Competition[] = [
     name: "Ligue 1",
     country: "France",
     teams: [
-      "Angers",
-      "Auxerre",
       "Brest",
-      "Le Havre",
       "Lens",
       "Lille",
-      "Lorient",
       "Lyon",
       "Marseille",
-      "Metz",
       "Monaco",
-      "Nantes",
       "Nice",
-      "Paris FC",
       "Paris Saint-Germain",
       "Rennes",
       "Strasbourg",
-      "Toulouse",
     ],
   },
 ];
@@ -156,3 +94,17 @@ export function competitionName(id: string): string {
 
 /** How many distinct competitions each entrant ranks. */
 export const PREFERENCES_REQUIRED = 3;
+
+/** Every club in the pool — the hard ceiling on how many can be drafted. */
+export const TOTAL_CLUBS = COMPETITIONS.reduce((n, c) => n + c.teams.length, 0);
+
+/**
+ * The smallest pool anyone can end up with: the required number of
+ * competitions, taking the smallest ones. No draft should allow more entries
+ * than this, or a late entrant could find all their leagues exhausted.
+ */
+export const SAFE_MAX_ENTRIES = [...COMPETITIONS]
+  .map((c) => c.teams.length)
+  .sort((a, b) => a - b)
+  .slice(0, PREFERENCES_REQUIRED)
+  .reduce((n, size) => n + size, 0);

@@ -3,13 +3,17 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { DraftSummary } from "@/lib/draft";
+import { DraftReveal } from "./DraftReveal";
 
 interface DraftInfo {
   leagueName: string;
   slug: string;
   seasonStarted: boolean;
   preferencesRequired: number;
-  competitions: { id: string; name: string; country: string; teams: number }[];
+  competitions: { id: string; name: string; country: string; teams: string[] }[];
+  requireInvite: boolean;
+  /** Set when this browser has already entered. */
+  you: Result | null;
   draft: DraftSummary | null;
 }
 
@@ -26,10 +30,13 @@ export function DraftPage({ slug }: { slug: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [picks, setPicks] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  /** Held back until the reveal finishes, so the list below cannot spoil it. */
+  const [pending, setPending] = useState<Result | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -75,7 +82,7 @@ export function DraftPage({ slug }: { slug: string }) {
       const res = await fetch(`/api/leagues/${slug}/draft/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, preferences: picks }),
+        body: JSON.stringify({ name, preferences: picks, inviteCode }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -83,8 +90,7 @@ export function DraftPage({ slug }: { slug: string }) {
         await load();
         return;
       }
-      setResult(data.entry as Result);
-      await load();
+      setPending(data.entry as Result);
     } catch {
       setError("Network error — try again");
     } finally {
@@ -110,6 +116,12 @@ export function DraftPage({ slug }: { slug: string }) {
 
   const draft = info.draft;
   const closed = !draft || !draft.open || draft.full || info.seasonStarted;
+  const mine = info.you;
+
+  // Shuffle through clubs from the leagues they actually ranked.
+  const revealPool = pending
+    ? info.competitions.filter((c) => picks.includes(c.id)).flatMap((c) => c.teams)
+    : [];
 
   return (
     <main className="shell draft-shell">
@@ -129,13 +141,41 @@ export function DraftPage({ slug }: { slug: string }) {
         </p>
       </header>
 
-      {result ? (
+      {pending ? (
+        <DraftReveal
+          team={pending.team}
+          competition={pending.competition}
+          player={pending.player}
+          pool={revealPool.length ? revealPool : [pending.team]}
+          onDone={() => {
+            setResult(pending);
+            setPending(null);
+            load();
+          }}
+        />
+      ) : result ? (
         <section className="card reveal">
           <p className="reveal-kicker">You drafted</p>
           <p className="reveal-team">{result.team}</p>
           <p className="reveal-comp">{result.competition}</p>
           <p className="reveal-name">
             You will appear in the table as <strong>{result.player}</strong>
+          </p>
+          <Link href={`/l/${slug}`} className="mini save reveal-link">
+            View the league
+          </Link>
+        </section>
+      ) : mine ? (
+        <section className="card">
+          <h2 className="section-title">You are in the draft</h2>
+          <p className="reveal-team mine">{mine.team}</p>
+          <p className="reveal-comp">{mine.competition}</p>
+          <p className="reveal-name">
+            You appear in the table as <strong>{mine.player}</strong>
+          </p>
+          <p className="muted">
+            One entry each — you cannot draft again. If something went wrong, ask whoever runs the
+            league to remove your entry.
           </p>
           <Link href={`/l/${slug}`} className="mini save reveal-link">
             View the league
@@ -163,7 +203,8 @@ export function DraftPage({ slug }: { slug: string }) {
           <h2 className="section-title">Enter the draft</h2>
           <p className="muted">
             Put in your name, rank {required} leagues, and a club is drawn for you from them. Your
-            first choice is the most likely. No two players get the same club.
+            first choice is the most likely. No two players get the same club, and everyone gets
+            one entry only.
           </p>
 
           <form
@@ -184,6 +225,20 @@ export function DraftPage({ slug }: { slug: string }) {
                 required
               />
             </label>
+
+            {info.requireInvite && (
+              <label>
+                Invite code
+                <input
+                  type="text"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  placeholder="e.g. ABC-234"
+                  autoComplete="off"
+                  required
+                />
+              </label>
+            )}
 
             <div className="pick-head">
               <span>
@@ -210,7 +265,7 @@ export function DraftPage({ slug }: { slug: string }) {
                     {rank >= 0 && <span className="comp-rank">{rank + 1}</span>}
                     <span className="comp-name">{c.name}</span>
                     <span className="comp-meta">
-                      {c.country} · {c.teams} clubs
+                      {c.country} · {c.teams.length} clubs
                     </span>
                   </button>
                 );

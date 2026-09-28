@@ -1,23 +1,34 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import {
   DEFAULT_MAX_ENTRIES,
   emptyDraft,
+  ensureInvites,
+  entryForDevice,
   summariseDraft,
   type DraftState,
 } from "@/lib/draft";
 import { MAX_PLAYERS } from "@/lib/leagues";
-import { COMPETITIONS, PREFERENCES_REQUIRED } from "@/lib/teams";
+import { COMPETITIONS, PREFERENCES_REQUIRED, SAFE_MAX_ENTRIES, competitionName } from "@/lib/teams";
 import { loadLeague, setDraft, updateLeague } from "@/lib/store";
 import { authorise, serverError } from "@/lib/api";
+import { DRAFT_COOKIE } from "@/lib/draftCookie";
 
 export const dynamic = "force-dynamic";
 
 /** Public: what the share link needs to render. No admin code required. */
-export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
   const { slug } = await params;
   try {
     const league = await loadLeague(slug);
     if (!league) return NextResponse.json({ error: "League not found" }, { status: 404 });
+
+    // If this browser already entered, hand back its own entry so the page can
+    // show it instead of the form.
+    const deviceId = request.cookies.get(DRAFT_COOKIE(slug))?.value;
+    const mine = league.draft ? entryForDevice(league.draft, deviceId) : null;
 
     return NextResponse.json({
       leagueName: league.name,
@@ -28,8 +39,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
         id: c.id,
         name: c.name,
         country: c.country,
-        teams: c.teams.length,
+        teams: c.teams,
       })),
+      requireInvite: Boolean(league.draft?.requireInvite),
+      you: mine
+        ? {
+            name: mine.name,
+            team: mine.team,
+            competition: competitionName(mine.competitionId),
+            player: mine.player,
+          }
+        : null,
       draft: league.draft ? summariseDraft(league.draft) : null,
     });
   } catch (err) {
@@ -51,9 +71,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     if (action === "open") {
       const raw = body.maxEntries;
       const maxEntries = typeof raw === "number" ? raw : DEFAULT_MAX_ENTRIES;
-      if (!Number.isInteger(maxEntries) || maxEntries < 2 || maxEntries > MAX_PLAYERS) {
+      const ceiling = Math.min(MAX_PLAYERS, SAFE_MAX_ENTRIES);
+      if (!Number.isInteger(maxEntries) || maxEntries < 2 || maxEntries > ceiling) {
         return NextResponse.json(
-          { error: `Maximum entries must be a whole number between 2 and ${MAX_PLAYERS}` },
+          {
+            error: `Maximum entries must be a whole number between 2 and ${ceiling} — beyond that, a late entrant could find every club in their leagues taken.`,
+          },
           { status: 400 }
         );
       }
@@ -76,6 +99,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
           { status: 409 }
         );
       }
+      if (draft.requireInvite) draft.invites = ensureInvites(draft, draft.maxEntries);
       return NextResponse.json({ league: await setDraft(slug, draft) });
     }
 
@@ -105,6 +129,60 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
           l.players = l.players.filter((p) => !drafted.has(p));
           l.fixtures = [];
           l.draft = null;
+        }),
+      });
+    }
+
+    if (action === "invites") {
+      const draft = league.draft;
+      if (!draft) return NextResponse.json({ error: "No draft running" }, { status: 400 });
+
+      const wanted = body.require;
+      if (typeof wanted === "boolean") {
+        const invites = wanted ? ensureInvites(draft, draft.maxEntries) : (draft.invites ?? []);
+        const updated = await setDraft(slug, { ...draft, requireInvite: wanted, invites });
+        return NextResponse.json({
+          league: updated,
+          invites: wanted ? invites : [],
+        });
+      }
+
+      // Just reading the codes back for the admin screen.
+      const invites = ensureInvites(draft, draft.maxEntries);
+      if (invites.length !== (draft.invites ?? []).length) {
+        await setDraft(slug, { ...draft, invites });
+      }
+      return NextResponse.json({ league: { ...league, draft: { ...draft, invites } }, invites });
+    }
+
+    if (action === "removeEntry") {
+      const draft = league.draft;
+      const entryId = body.entryId;
+      if (!draft || typeof entryId !== "string") {
+        return NextResponse.json({ error: "Unknown entry" }, { status: 400 });
+      }
+      const entry = draft.entries.find((e) => e.id === entryId);
+      if (!entry) return NextResponse.json({ error: "Unknown entry" }, { status: 404 });
+      if (Object.keys(league.scores).length > 0) {
+        return NextResponse.json(
+          { error: "Results have been recorded, so entries cannot be removed." },
+          { status: 409 }
+        );
+      }
+
+      return NextResponse.json({
+        league: await updateLeague(slug, (l) => {
+          if (!l.draft) return;
+          l.draft = {
+            ...l.draft,
+            entries: l.draft.entries.filter((e) => e.id !== entryId),
+            // Free the invite so that person can enter again.
+            invites: (l.draft.invites ?? []).map((i) =>
+              i.usedBy === entryId ? { ...i, usedBy: null, usedAt: null } : i
+            ),
+          };
+          l.players = l.players.filter((p) => p !== entry.player);
+          l.fixtures = [];
         }),
       });
     }

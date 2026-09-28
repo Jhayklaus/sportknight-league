@@ -38,10 +38,10 @@ own page at `/l/<slug>`.
   are salted and hashed, checked server-side on every write, and never shared
   between leagues.
 - **Team draft** — for authentic-teams tournaments. An admin opens a draft and
-  shares `/l/<slug>/draft`; entrants give a name, rank three of Europe's top five
-  leagues, and a club is drawn for them from those leagues. They join the table
-  as `Name (Club)`. No two entrants get the same club, and the draft closes
-  itself once the entry limit (20 by default) is reached.
+  shares `/l/<slug>/draft`; entrants give a name, rank three of four leagues, and
+  a club is drawn for them with a slot-machine reveal. They join the table as
+  `Name (Club)`. No two entrants get the same club, and the draft closes itself
+  once the entry limit (20 by default) is reached.
 
 Finished seasons are archived with player names baked into each result, so past
 seasons stay correct even if the roster or fixture list changes later.
@@ -103,8 +103,38 @@ being open and having a free place is the only gate. Entrants cannot pick a
 club directly: they rank three competitions and one is drawn, weighted 3/2/1
 towards their first choice, from the clubs nobody has taken yet.
 
-Club lists live in `lib/teams.ts` as plain data — edit them after promotions
-and relegations, or trim them to the clubs your game licenses.
+The pool is the strongest ten clubs from four leagues — the Premier League,
+LaLiga, Serie A and Ligue 1 — 40 clubs in all. The Bundesliga is left out
+because eFootball's coverage of it is thin, and each league is trimmed to ten so
+every entrant draws a competitive side. All of that is plain data in
+`lib/teams.ts`: edit the lists as clubs rise, fall, or lose their licence.
+
+Because entrants only ever see three of the four leagues, the entry limit is
+capped at the size of the three smallest pools (30 here) so a late entrant can
+never find every one of their clubs taken.
+
+The reveal spins through clubs from the leagues the entrant ranked for about
+four and a half seconds, slowing to a stop on theirs. It can be skipped, and it
+is replaced by an instant result for anyone who asks for reduced motion.
+
+### One entry each
+
+Three guards, weakest to strongest:
+
+1. **Unique names** — two entrants cannot share a nickname.
+2. **One entry per browser** — a successful entry sets an http-only cookie, and
+   that browser is refused a second club. Revisiting the link shows the club it
+   already drew instead of the form. Clearing cookies or using a private window
+   defeats this, so it is a deterrent, not a guarantee.
+3. **Invite codes** (optional, per draft) — switch them on and the app issues one
+   single-use code per place. Send each person their own; a code works once, and
+   entry without a valid unused code is refused. This is the airtight option.
+
+Codes and device tokens are secrets: they are stripped from the public league
+payload, the public draft payload and the downloadable backup.
+
+An admin can remove any entry, which frees both the club and the invite code
+that entry used, so a genuine mistake can be undone.
 
 Drafted players are added to the roster immediately, so the admin can generate
 fixtures straight from the Draft tab once it closes. Scrapping a draft removes
