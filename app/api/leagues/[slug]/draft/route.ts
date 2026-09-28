@@ -6,7 +6,7 @@ import {
   type DraftState,
 } from "@/lib/draft";
 import { MAX_PLAYERS } from "@/lib/leagues";
-import { COMPETITIONS, PREFERENCES_REQUIRED } from "@/lib/teams";
+import { COMPETITIONS, PREFERENCES_REQUIRED, SAFE_MAX_ENTRIES } from "@/lib/teams";
 import { loadLeague, setDraft, updateLeague } from "@/lib/store";
 import { authorise, serverError } from "@/lib/api";
 
@@ -28,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
         id: c.id,
         name: c.name,
         country: c.country,
-        teams: c.teams.length,
+        teams: c.teams,
       })),
       draft: league.draft ? summariseDraft(league.draft) : null,
     });
@@ -51,9 +51,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     if (action === "open") {
       const raw = body.maxEntries;
       const maxEntries = typeof raw === "number" ? raw : DEFAULT_MAX_ENTRIES;
-      if (!Number.isInteger(maxEntries) || maxEntries < 2 || maxEntries > MAX_PLAYERS) {
+      const ceiling = Math.min(MAX_PLAYERS, SAFE_MAX_ENTRIES);
+      if (!Number.isInteger(maxEntries) || maxEntries < 2 || maxEntries > ceiling) {
         return NextResponse.json(
-          { error: `Maximum entries must be a whole number between 2 and ${MAX_PLAYERS}` },
+          {
+            error: `Maximum entries must be a whole number between 2 and ${ceiling} — beyond that, a late entrant could find every club in their leagues taken.`,
+          },
           { status: 400 }
         );
       }

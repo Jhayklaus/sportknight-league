@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { DraftSummary } from "@/lib/draft";
+import { DraftReveal } from "./DraftReveal";
 
 interface DraftInfo {
   leagueName: string;
   slug: string;
   seasonStarted: boolean;
   preferencesRequired: number;
-  competitions: { id: string; name: string; country: string; teams: number }[];
+  competitions: { id: string; name: string; country: string; teams: string[] }[];
   draft: DraftSummary | null;
 }
 
@@ -30,6 +31,8 @@ export function DraftPage({ slug }: { slug: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  /** Held back until the reveal finishes, so the list below cannot spoil it. */
+  const [pending, setPending] = useState<Result | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -83,8 +86,7 @@ export function DraftPage({ slug }: { slug: string }) {
         await load();
         return;
       }
-      setResult(data.entry as Result);
-      await load();
+      setPending(data.entry as Result);
     } catch {
       setError("Network error — try again");
     } finally {
@@ -111,6 +113,11 @@ export function DraftPage({ slug }: { slug: string }) {
   const draft = info.draft;
   const closed = !draft || !draft.open || draft.full || info.seasonStarted;
 
+  // Shuffle through clubs from the leagues they actually ranked.
+  const revealPool = pending
+    ? info.competitions.filter((c) => picks.includes(c.id)).flatMap((c) => c.teams)
+    : [];
+
   return (
     <main className="shell draft-shell">
       <header className="hero">
@@ -129,7 +136,19 @@ export function DraftPage({ slug }: { slug: string }) {
         </p>
       </header>
 
-      {result ? (
+      {pending ? (
+        <DraftReveal
+          team={pending.team}
+          competition={pending.competition}
+          player={pending.player}
+          pool={revealPool.length ? revealPool : [pending.team]}
+          onDone={() => {
+            setResult(pending);
+            setPending(null);
+            load();
+          }}
+        />
+      ) : result ? (
         <section className="card reveal">
           <p className="reveal-kicker">You drafted</p>
           <p className="reveal-team">{result.team}</p>
@@ -210,7 +229,7 @@ export function DraftPage({ slug }: { slug: string }) {
                     {rank >= 0 && <span className="comp-rank">{rank + 1}</span>}
                     <span className="comp-name">{c.name}</span>
                     <span className="comp-meta">
-                      {c.country} · {c.teams} clubs
+                      {c.country} · {c.teams.length} clubs
                     </span>
                   </button>
                 );
