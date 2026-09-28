@@ -1,9 +1,13 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import {
   assignTeam,
   draftLabel,
   isDraftJoinable,
   normaliseNickname,
+  entryForDevice,
+  findUnusedInvite,
+  newDeviceId,
+  normaliseInviteCode,
   normalisePreferences,
   spotsLeft,
   summariseDraft,
@@ -16,6 +20,7 @@ import { MAX_PLAYERS } from "@/lib/leagues";
 import { competitionName, PREFERENCES_REQUIRED } from "@/lib/teams";
 import { DraftClosedError, commitDraftEntry, loadLeague } from "@/lib/store";
 import { readBody, serverError } from "@/lib/api";
+import { DRAFT_COOKIE, DRAFT_COOKIE_MAX_AGE } from "@/lib/draftCookie";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +28,10 @@ export const dynamic = "force-dynamic";
  * Public: anyone with the share link can enter once. No admin code — the draft
  * being open, and having a free spot, is the only gate.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ slug: string }> }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
   const { slug } = await params;
   const body = await readBody(request);
   if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
@@ -49,6 +57,43 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       { error: "This season has already started, so the draft is closed." },
       { status: 409 }
     );
+  }
+
+  // One entry per browser. Not unbreakable — clearing cookies defeats it — so
+  // invite codes below are there when a draft has to be airtight.
+  const deviceId = request.cookies.get(DRAFT_COOKIE(slug))?.value;
+  const already = entryForDevice(draft, deviceId);
+  if (already) {
+    return NextResponse.json(
+      {
+        error: `You have already drafted ${already.team}. Only one entry each.`,
+        entry: {
+          name: already.name,
+          team: already.team,
+          competition: competitionName(already.competitionId),
+          player: already.player,
+        },
+      },
+      { status: 409 }
+    );
+  }
+
+  let invite: string | undefined;
+  if (draft.requireInvite) {
+    const code = normaliseInviteCode(body.inviteCode);
+    if (!code) {
+      return NextResponse.json(
+        { error: "This draft needs an invite code. Check the one you were sent." },
+        { status: 400 }
+      );
+    }
+    if (!findUnusedInvite(draft, code)) {
+      return NextResponse.json(
+        { error: "That invite code is not valid, or has already been used." },
+        { status: 409 }
+      );
+    }
+    invite = code;
   }
 
   const name = normaliseNickname(body.name);
@@ -94,6 +139,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     return NextResponse.json({ error: "This league is full." }, { status: 409 });
   }
 
+  const token = deviceId ?? newDeviceId();
+
   try {
     // Re-checked against fresh state inside the commit, in case someone else
     // claimed the same club a moment ago.
@@ -104,6 +151,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       }
       if (freshDraft.entries.some((e) => e.name.toLowerCase() === name.toLowerCase())) {
         throw new DraftClosedError("Somebody just entered with that name — try another.");
+      }
+      if (entryForDevice(freshDraft, deviceId)) {
+        throw new DraftClosedError("You have already drafted a club.");
+      }
+      if (freshDraft.requireInvite) {
+        if (!invite || !findUnusedInvite(freshDraft, invite)) {
+          throw new DraftClosedError("That invite code has just been used.");
+        }
       }
 
       const stillFree = !takenTeams(freshDraft).has(assignment.team);
@@ -120,12 +175,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
         preferences,
         player: draftLabel(name, final.team),
         at: new Date().toISOString(),
+        deviceId: token,
+        inviteCode: invite,
       };
+
+      if (invite) {
+        freshDraft.invites = (freshDraft.invites ?? []).map((i) =>
+          i.code === invite ? { ...i, usedBy: entry.id, usedAt: entry.at } : i
+        );
+      }
+
       return { entry, player: entry.player };
     });
 
     const mine = updated.draft?.entries.find((e) => e.name === name);
-    return NextResponse.json({
+    const response = NextResponse.json({
       entry: mine
         ? {
             name: mine.name,
@@ -136,6 +200,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
         : null,
       draft: updated.draft ? summariseDraft(updated.draft) : null,
     });
+    response.cookies.set({
+      name: DRAFT_COOKIE(slug),
+      value: token,
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: DRAFT_COOKIE_MAX_AGE,
+    });
+    return response;
   } catch (err) {
     if (err instanceof DraftClosedError) {
       return NextResponse.json({ error: err.message }, { status: 409 });

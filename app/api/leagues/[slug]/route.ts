@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadLeague } from "@/lib/store";
+import { toPublicLeague } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +10,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   try {
     const league = await loadLeague(slug);
     if (!league) return NextResponse.json({ error: "League not found" }, { status: 404 });
-    const { auth, ...safe } = league;
-    return NextResponse.json({ league: { ...safe, hasCustomCode: auth !== null } });
+    return NextResponse.json({ league: toPublicLeague(league) });
   } catch (err) {
     console.error("Failed to read league:", err);
     return NextResponse.json({ error: "Could not read league data" }, { status: 500 });

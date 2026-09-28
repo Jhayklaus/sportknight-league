@@ -24,6 +24,8 @@ export function DraftTab({
   const [error, setError] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [invites, setInvites] = useState<{ code: string; usedBy: string | null }[]>([]);
+  const [showCodes, setShowCodes] = useState(false);
   const [shareUrl, setShareUrl] = useState(`/l/${slug}/draft`);
 
   useEffect(() => {
@@ -51,6 +53,7 @@ export function DraftTab({
         return;
       }
       onLeagueUpdated(data.league as PublicLeague);
+      if (Array.isArray(data.invites)) setInvites(data.invites);
       setConfirmReset(false);
     } catch {
       setError("Network error — try again");
@@ -163,7 +166,65 @@ export function DraftTab({
             closes itself when full — no admin code needed to enter.
           </p>
 
-          {draft.entries.length > 0 && <EntryList entries={draft.entries} />}
+          {draft.entries.length > 0 && (
+            <EntryList
+              entries={draft.entries}
+              onRemove={(id) => send({ action: "removeEntry", entryId: id })}
+              busy={busy}
+            />
+          )}
+
+          <div className="invite-box">
+            <h4 className="sub-head">One entry per person</h4>
+            <p className="muted">
+              Every entrant is already held to one club per browser, and to a unique name. For an
+              airtight draft, switch on invite codes and send each person their own — a code works
+              once.
+            </p>
+            <div className="window-form">
+              <button
+                className={draft.requireInvite ? "mini" : "mini save"}
+                disabled={busy}
+                onClick={() => send({ action: "invites", require: !draft.requireInvite })}
+              >
+                {draft.requireInvite ? "Turn invite codes off" : "Require invite codes"}
+              </button>
+              {draft.requireInvite && (
+                <button
+                  className="mini"
+                  disabled={busy}
+                  onClick={async () => {
+                    if (!showCodes) await send({ action: "invites" });
+                    setShowCodes(!showCodes);
+                  }}
+                >
+                  {showCodes ? "Hide codes" : "Show codes"}
+                </button>
+              )}
+            </div>
+
+            {draft.requireInvite && showCodes && invites.length > 0 && (
+              <>
+                <ul className="code-list">
+                  {invites.map((i) => (
+                    <li key={i.code} className={i.usedBy ? "used" : ""}>
+                      <code>{i.code}</code>
+                      <span className="muted">{i.usedBy ? "used" : "free"}</span>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  className="mini ghost"
+                  onClick={() => {
+                    const free = invites.filter((i) => !i.usedBy).map((i) => i.code);
+                    navigator.clipboard.writeText(free.join("\n")).catch(() => {});
+                  }}
+                >
+                  Copy unused codes
+                </button>
+              </>
+            )}
+          </div>
 
           <div className="window-form">
             {draft.open ? (
@@ -236,8 +297,12 @@ export function DraftTab({
 
 function EntryList({
   entries,
+  onRemove,
+  busy,
 }: {
   entries: NonNullable<PublicLeague["draft"]>["entries"];
+  onRemove?: (id: string) => void;
+  busy?: boolean;
 }) {
   return (
     <>
@@ -248,6 +313,16 @@ function EntryList({
             <span className="draft-name">{e.name}</span>
             <span className="draft-team">{e.team}</span>
             <span className="draft-comp muted">{competitionName(e.competitionId)}</span>
+            {onRemove && (
+              <button
+                className="mini danger"
+                disabled={busy}
+                onClick={() => onRemove(e.id)}
+                title="Remove this entry and free the club"
+              >
+                Remove
+              </button>
+            )}
           </li>
         ))}
       </ul>

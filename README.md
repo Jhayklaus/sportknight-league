@@ -117,6 +117,25 @@ The reveal spins through clubs from the leagues the entrant ranked for about
 four and a half seconds, slowing to a stop on theirs. It can be skipped, and it
 is replaced by an instant result for anyone who asks for reduced motion.
 
+### One entry each
+
+Three guards, weakest to strongest:
+
+1. **Unique names** — two entrants cannot share a nickname.
+2. **One entry per browser** — a successful entry sets an http-only cookie, and
+   that browser is refused a second club. Revisiting the link shows the club it
+   already drew instead of the form. Clearing cookies or using a private window
+   defeats this, so it is a deterrent, not a guarantee.
+3. **Invite codes** (optional, per draft) — switch them on and the app issues one
+   single-use code per place. Send each person their own; a code works once, and
+   entry without a valid unused code is refused. This is the airtight option.
+
+Codes and device tokens are secrets: they are stripped from the public league
+payload, the public draft payload and the downloadable backup.
+
+An admin can remove any entry, which frees both the club and the invite code
+that entry used, so a genuine mistake can be undone.
+
 Drafted players are added to the roster immediately, so the admin can generate
 fixtures straight from the Draft tab once it closes. Scrapping a draft removes
 the drafted players again (but not anyone added by hand), and is refused once

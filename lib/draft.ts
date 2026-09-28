@@ -16,6 +16,17 @@ export interface DraftEntry {
   /** The roster name this produced, e.g. "Jamiu (Real Madrid)". */
   player: string;
   at: string;
+  /** Secret: the browser token that entered, so the same device cannot re-enter. */
+  deviceId?: string;
+  /** Secret: the invite this entry consumed, when invites are required. */
+  inviteCode?: string;
+}
+
+/** A single-use code, when the admin wants exactly one entry per person. */
+export interface DraftInvite {
+  code: string;
+  usedBy: string | null;
+  usedAt: string | null;
 }
 
 export interface DraftState {
@@ -24,6 +35,10 @@ export interface DraftState {
   entries: DraftEntry[];
   openedAt: string | null;
   closedAt: string | null;
+  /** When true, an unused invite code is required to enter. */
+  requireInvite?: boolean;
+  /** Secret: never sent to the public draft page. */
+  invites?: DraftInvite[];
 }
 
 export const DEFAULT_MAX_ENTRIES = 20;
@@ -38,6 +53,69 @@ export function emptyDraft(maxEntries = DEFAULT_MAX_ENTRIES): DraftState {
     entries: [],
     openedAt: new Date().toISOString(),
     closedAt: null,
+    requireInvite: false,
+    invites: [],
+  };
+}
+
+/* ----------------------------------------------------------- invite codes */
+
+// Unambiguous alphabet: no O/0, I/1, so codes survive being read aloud.
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const CODE_LENGTH = 6;
+
+function randomCode(): string {
+  let out = "";
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    out += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  }
+  return `${out.slice(0, 3)}-${out.slice(3)}`;
+}
+
+/** Top the pool up to `count` codes, keeping any already issued. */
+export function ensureInvites(draft: DraftState, count: number): DraftInvite[] {
+  const invites = [...(draft.invites ?? [])];
+  const seen = new Set(invites.map((i) => i.code));
+  while (invites.length < count) {
+    let code = randomCode();
+    let guard = 0;
+    while (seen.has(code) && guard++ < 50) code = randomCode();
+    seen.add(code);
+    invites.push({ code, usedBy: null, usedAt: null });
+  }
+  return invites;
+}
+
+export function normaliseInviteCode(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (cleaned.length !== CODE_LENGTH) return null;
+  return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+}
+
+export function findUnusedInvite(draft: DraftState, code: string): DraftInvite | null {
+  return (draft.invites ?? []).find((i) => i.code === code && !i.usedBy) ?? null;
+}
+
+/** A device token is minted per entry and stored in an http-only cookie. */
+export function newDeviceId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+export function entryForDevice(draft: DraftState, deviceId: string | undefined): DraftEntry | null {
+  if (!deviceId) return null;
+  return draft.entries.find((e) => e.deviceId === deviceId) ?? null;
+}
+
+/**
+ * Strip everything an entrant should not see: other people's device tokens and
+ * every invite code. Used for the public league payloads.
+ */
+export function sanitiseDraft(draft: DraftState): DraftState {
+  return {
+    ...draft,
+    entries: draft.entries.map(({ deviceId, inviteCode, ...rest }) => rest),
+    invites: undefined,
   };
 }
 

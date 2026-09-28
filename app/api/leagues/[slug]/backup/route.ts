@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadLeague, replaceLeagueData } from "@/lib/store";
-import { authorise, serverError } from "@/lib/api";
+import { authorise, serverError, toPublicLeague } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   try {
     const league = await loadLeague(slug);
     if (!league) return NextResponse.json({ error: "League not found" }, { status: 404 });
-    const { auth, ...safe } = league;
+    const safe = toPublicLeague(league);
     const stamp = new Date().toISOString().slice(0, 10);
     return new NextResponse(
       JSON.stringify({ exportedAt: new Date().toISOString(), ...safe }, null, 2),
