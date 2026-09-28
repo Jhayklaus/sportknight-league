@@ -37,6 +37,11 @@ own page at `/l/<slug>`.
 - **Multiple leagues** — create one at `/leagues` with its own admin code. Codes
   are salted and hashed, checked server-side on every write, and never shared
   between leagues.
+- **Team draft** — for authentic-teams tournaments. An admin opens a draft and
+  shares `/l/<slug>/draft`; entrants give a name, rank three of Europe's top five
+  leagues, and a club is drawn for them from those leagues. They join the table
+  as `Name (Club)`. No two entrants get the same club, and the draft closes
+  itself once the entry limit (20 by default) is reached.
 
 Finished seasons are archived with player names baked into each result, so past
 seasons stay correct even if the roster or fixture list changes later.
@@ -90,6 +95,21 @@ save scores there (writes return 500). Set up the Redis backend:
 2. While you're in **Settings → Environment Variables**, also set `LEAGUE_PIN`
    to your real secret — otherwise the default `1234` is live.
 3. Redeploy. Score updates now persist in Redis.
+
+## The team draft
+
+Opened from a league's **Draft** tab. The share link needs no admin code —
+being open and having a free place is the only gate. Entrants cannot pick a
+club directly: they rank three competitions and one is drawn, weighted 3/2/1
+towards their first choice, from the clubs nobody has taken yet.
+
+Club lists live in `lib/teams.ts` as plain data — edit them after promotions
+and relegations, or trim them to the clubs your game licenses.
+
+Drafted players are added to the roster immediately, so the admin can generate
+fixtures straight from the Draft tab once it closes. Scrapping a draft removes
+the drafted players again (but not anyone added by hand), and is refused once
+results exist.
 
 ## Fixtures
 

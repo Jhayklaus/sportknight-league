@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import legacyFixtures from "./fixtures.json";
 import { archiveCurrentSeason, isSeasonComplete, type Deduction, type LeagueWindow, type Match, type Score } from "./league";
+import type { DraftEntry, DraftState } from "./draft";
 import {
   emptyLeague,
   generateFixtures,
@@ -149,6 +150,7 @@ function parseLeague(raw: string): LeagueRecord | null {
       season: typeof doc.season === "number" ? doc.season : 1,
       seasons: Array.isArray(doc.seasons) ? doc.seasons : [],
       relegationCount: typeof doc.relegationCount === "number" ? doc.relegationCount : 0,
+      draft: (doc.draft as DraftState | null | undefined) ?? null,
     };
   } catch {
     return null;
@@ -281,6 +283,7 @@ export async function replaceLeagueData(
     if (Array.isArray(next.players) && next.players.length) league.players = next.players;
     if (Array.isArray(next.fixtures) && next.fixtures.length) league.fixtures = next.fixtures;
     if (typeof next.relegationCount === "number") league.relegationCount = next.relegationCount;
+    if (next.draft !== undefined) league.draft = next.draft;
   });
 }
 
@@ -320,5 +323,57 @@ export async function rolloverSeason(
     league.window = null;
     league.players = players;
     league.fixtures = generateFixtures(players);
+    league.draft = null;
   });
+}
+
+/* ------------------------------------------------------------------ draft */
+
+export class DraftClosedError extends Error {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export async function setDraft(
+  slug: string,
+  draft: DraftState | null
+): Promise<LeagueRecord | null> {
+  return updateLeague(slug, (league) => {
+    league.draft = draft;
+  });
+}
+
+/**
+ * Add one drafted entrant. Storage has no transactions, so two people
+ * submitting at the same moment could both read the same state and one write
+ * could clobber the other. After saving we re-read and confirm our entry
+ * survived; if it did not, the caller retries with fresh state.
+ */
+export async function commitDraftEntry(
+  slug: string,
+  build: (league: LeagueRecord) => { entry: DraftEntry; player: string }
+): Promise<LeagueRecord> {
+  const attempts = 4;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const league = await loadLeague(slug);
+    if (!league) throw new DraftClosedError("League not found");
+
+    const { entry, player } = build(league);
+    const draft = league.draft;
+    if (!draft) throw new DraftClosedError("The draft is not running.");
+
+    draft.entries = [...draft.entries, entry];
+    league.players = [...league.players, player];
+    if (draft.entries.length >= draft.maxEntries) {
+      draft.open = false;
+      draft.closedAt = new Date().toISOString();
+    }
+
+    await saveLeague(league);
+
+    const confirmed = await getLeague(slug);
+    if (confirmed?.draft?.entries.some((e) => e.id === entry.id)) return confirmed;
+  }
+  throw new DraftClosedError("The draft is busy — please try again.");
 }
