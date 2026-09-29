@@ -4,6 +4,7 @@ import legacyFixtures from "./fixtures.json";
 import { archiveCurrentSeason, isSeasonComplete, type Deduction, type LeagueWindow, type Match, type Score } from "./league";
 import type { DraftEntry, DraftState } from "./draft";
 import {
+  DEFAULT_LEGS,
   emptyLeague,
   generateFixtures,
   viewOf,
@@ -151,6 +152,7 @@ function parseLeague(raw: string): LeagueRecord | null {
       seasons: Array.isArray(doc.seasons) ? doc.seasons : [],
       relegationCount: typeof doc.relegationCount === "number" ? doc.relegationCount : 0,
       draft: (doc.draft as DraftState | null | undefined) ?? null,
+      legs: doc.legs === 1 ? 1 : DEFAULT_LEGS,
     };
   } catch {
     return null;
@@ -284,6 +286,7 @@ export async function replaceLeagueData(
     if (Array.isArray(next.fixtures) && next.fixtures.length) league.fixtures = next.fixtures;
     if (typeof next.relegationCount === "number") league.relegationCount = next.relegationCount;
     if (next.draft !== undefined) league.draft = next.draft;
+    if (next.legs === 1 || next.legs === 2) league.legs = next.legs;
   });
 }
 
@@ -322,7 +325,7 @@ export async function rolloverSeason(
     league.deductions = [];
     league.window = null;
     league.players = players;
-    league.fixtures = generateFixtures(players);
+    league.fixtures = generateFixtures(players, league.legs ?? DEFAULT_LEGS);
     league.draft = null;
   });
 }

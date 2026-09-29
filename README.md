@@ -34,6 +34,8 @@ own page at `/l/<slug>`.
 - **Relegation** — each league sets how many players drop out per season. At the
   rollover the bottom placings are pre-ticked, admins adjust who leaves, name the
   replacements, and next season's fixtures are generated automatically.
+- **One leg or two** — a league plays everyone once, or home and away. Chosen at
+  creation and switchable from the Roster tab until results are recorded.
 - **Multiple leagues** — create one at `/leagues` with its own admin code. Codes
   are salted and hashed, checked server-side on every write, and never shared
   between leagues.
@@ -144,10 +146,14 @@ results exist.
 ## Fixtures
 
 Schedules are generated per league from its roster — there is no fixture file to
-edit. `lib/leagues.ts` builds a balanced double round-robin (every pair meets
-home and away, equal home/away counts) and then optimises venue order so nobody
-sits through a long run of home or away games. Odd rosters get a bye, so one
-player rests each matchday.
+edit. `lib/leagues.ts` builds a round-robin: once through for a one-legged
+league, or twice with venues swapped for home and away. Odd rosters get a bye,
+so one player rests each matchday.
+
+Venues are then optimised so nobody sits through a long run of home or away
+games. Two legs balance themselves by mirroring; a single round robin does not,
+so the generator also evens out each player's home and away count — exactly
+equal where the number of games allows it, and within one game otherwise.
 
 Rosters can only be changed while a season has no results; after that, use the
 relegation step at the season rollover. `lib/fixtures.json` is kept solely so the

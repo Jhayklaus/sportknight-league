@@ -57,7 +57,8 @@ export function LeagueDirectory() {
                 <Link href={`/l/${l.slug}`} className="league-link">
                   <span className="league-name">{l.name}</span>
                   <span className="muted">
-                    Season {l.season} · {l.players} players
+                    Season {l.season} · {l.players} players ·{" "}
+                    {l.legs === 1 ? "one leg" : "home & away"}
                     {l.total > 0 ? ` · ${l.played}/${l.total} played` : " · no fixtures yet"}
                   </span>
                 </Link>
@@ -77,6 +78,7 @@ function CreateLeagueForm({ gated, onCreated }: { gated: boolean; onCreated: () 
   const [creationCode, setCreationCode] = useState("");
   const [playersText, setPlayersText] = useState("");
   const [relegation, setRelegation] = useState("0");
+  const [legs, setLegs] = useState<1 | 2>(2);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<PublicLeague | null>(null);
@@ -108,6 +110,7 @@ function CreateLeagueForm({ gated, onCreated }: { gated: boolean; onCreated: () 
           players,
           creationCode: creationCode || undefined,
           relegationCount: Number(relegation) || 0,
+          legs,
         }),
       });
       const data = await res.json();
@@ -208,11 +211,30 @@ function CreateLeagueForm({ gated, onCreated }: { gated: boolean; onCreated: () 
         <p className="muted">
           {players.length} player{players.length === 1 ? "" : "s"}
           {players.length >= MIN_PLAYERS
-            ? ` · ${players.length * (players.length - 1)} matches over ${
-                players.length % 2 === 0 ? 2 * (players.length - 1) : 2 * players.length
-              } matchdays — fixtures are generated for you`
+            ? " — fixtures are generated for you"
             : ` · add at least ${MIN_PLAYERS} (you can also add them later)`}
         </p>
+
+        <div>
+          <span className="field-label">Format</span>
+          <div className="legs-toggle">
+            {([2, 1] as const).map((option) => (
+              <button
+                type="button"
+                key={option}
+                className={legs === option ? "legs-option active" : "legs-option"}
+                onClick={() => setLegs(option)}
+              >
+                <span className="legs-name">{option === 2 ? "Home & away" : "One leg"}</span>
+                <span className="legs-meta">
+                  {option === 2 ? "Play everyone twice" : "Play everyone once"}
+                  {players.length >= MIN_PLAYERS &&
+                    ` · ${(players.length * (players.length - 1)) / (option === 2 ? 1 : 2)} matches`}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         <label className="narrow">
           Players relegated each season

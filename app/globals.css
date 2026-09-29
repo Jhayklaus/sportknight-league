@@ -2231,3 +2231,57 @@ body {
   font-weight: 700;
   letter-spacing: 0.04em;
 }
+
+/* ---------- format toggle ---------- */
+
+.field-label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.legs-toggle {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.legs-option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 12px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.legs-option:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.legs-option.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.legs-option:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.legs-name {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.legs-meta {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}

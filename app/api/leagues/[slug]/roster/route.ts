@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import {
   MAX_PLAYERS,
   MIN_PLAYERS,
+  DEFAULT_LEGS,
   generateFixtures,
+  normaliseLegs,
   hasDuplicate,
   normalisePlayerName,
   validateFixtures,
@@ -98,9 +100,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       }
 
       const regenerate = players.length >= MIN_PLAYERS && body.generate === true;
-      let fixtures = regenerate ? generateFixtures(players) : [];
+      const legs = league.legs ?? DEFAULT_LEGS;
+      const fixtures = regenerate ? generateFixtures(players, legs) : [];
       if (regenerate) {
-        const errors = validateFixtures(players, fixtures);
+        const errors = validateFixtures(players, fixtures, legs);
         if (errors.length) {
           return NextResponse.json(
             { error: `Could not build a valid schedule: ${errors[0]}` },
@@ -121,6 +124,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       });
     }
 
+    if (action === "setLegs") {
+      const legs = normaliseLegs(body.legs);
+      // Changing the format rewrites every fixture, so it needs a clean season.
+      const fixtures = league.fixtures.length ? generateFixtures(league.players, legs) : [];
+      if (fixtures.length) {
+        const errors = validateFixtures(league.players, fixtures, legs);
+        if (errors.length) {
+          return NextResponse.json(
+            { error: `Could not build a valid schedule: ${errors[0]}` },
+            { status: 500 }
+          );
+        }
+      }
+      return NextResponse.json({
+        league: await updateLeague(slug, (l) => {
+          l.legs = legs;
+          l.fixtures = fixtures;
+          l.window = null;
+        }),
+      });
+    }
+
     if (action === "generate") {
       if (league.players.length < MIN_PLAYERS) {
         return NextResponse.json(
@@ -128,8 +153,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
           { status: 400 }
         );
       }
-      const fixtures = generateFixtures(league.players);
-      const errors = validateFixtures(league.players, fixtures);
+      const legs = league.legs ?? DEFAULT_LEGS;
+      const fixtures = generateFixtures(league.players, legs);
+      const errors = validateFixtures(league.players, fixtures, legs);
       if (errors.length) {
         return NextResponse.json(
           { error: `Could not build a valid schedule: ${errors[0]}` },
