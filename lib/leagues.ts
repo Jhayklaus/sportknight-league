@@ -37,6 +37,8 @@ export interface LeagueRecord {
   relegationCount: number;
   /** Optional team draft for a tournament. Absent when never used. */
   draft?: DraftState | null;
+  /** 2 = home and away (default), 1 = play everyone once. */
+  legs?: LegCount;
 }
 
 export interface LeagueSummary {
@@ -47,6 +49,15 @@ export interface LeagueSummary {
   played: number;
   total: number;
   createdAt: string;
+  legs: LegCount;
+}
+
+/** One leg = play everyone once. Two legs = home and away. */
+export type LegCount = 1 | 2;
+export const DEFAULT_LEGS: LegCount = 2;
+
+export function normaliseLegs(value: unknown): LegCount {
+  return value === 1 || value === "1" ? 1 : 2;
 }
 
 export const MAX_PLAYERS = 64;
@@ -67,6 +78,7 @@ export function emptyLeague(slug: string, name: string, auth: AdminAuth | null):
     seasons: [],
     relegationCount: 0,
     draft: null,
+    legs: DEFAULT_LEGS,
   };
 }
 
@@ -83,6 +95,7 @@ export function summarise(league: LeagueRecord): LeagueSummary {
     played: Object.keys(league.scores).length,
     total: league.fixtures.length,
     createdAt: league.createdAt,
+    legs: league.legs ?? DEFAULT_LEGS,
   };
 }
 
@@ -130,12 +143,13 @@ export function hasDuplicate(players: string[]): boolean {
 /* -------------------------------------------------------- fixture builder */
 
 /**
- * Double round-robin via the circle method. Venue orientation is then
+ * Round-robin via the circle method — once through for a one-legged league, or
+ * twice with venues swapped for home and away. Venue orientation is then
  * optimised so nobody sits through a long run of home or away games, which the
  * naive circle method produces. An odd roster gets a bye, so one player rests
  * each matchday.
  */
-export function generateFixtures(players: string[]): Match[] {
+export function generateFixtures(players: string[], legs: LegCount = DEFAULT_LEGS): Match[] {
   const roster = [...players];
   if (roster.length < MIN_PLAYERS) return [];
 
@@ -160,49 +174,172 @@ export function generateFixtures(players: string[]): Match[] {
   const flags = halfPairs.map((pairs, r) => pairs.map((_, i) => (r + i) % 2 === 0));
 
   const venueCost = (): number => {
-    const seq: string[][] = Array.from({ length: n }, () => new Array(rounds * 2));
+    const seq: string[][] = Array.from({ length: n }, () => new Array(rounds * legs));
     for (let r = 0; r < rounds; r++) {
       halfPairs[r].forEach(([a, b], i) => {
+        // A pair against the bye is not a game, so it must not land in the
+        // sequence — otherwise that player looks like they played an extra one.
+        if (roster[a] === BYE || roster[b] === BYE) return;
         const aHome = flags[r][i];
         seq[a][r] = aHome ? "H" : "A";
         seq[b][r] = aHome ? "A" : "H";
-        seq[a][r + rounds] = aHome ? "A" : "H";
-        seq[b][r + rounds] = aHome ? "H" : "A";
+        if (legs === 2) {
+          seq[a][r + rounds] = aHome ? "A" : "H";
+          seq[b][r + rounds] = aHome ? "H" : "A";
+        }
       });
     }
     let total = 0;
     for (let p = 0; p < n; p++) {
       if (roster[p] === BYE) continue;
+
       let run = 1;
-      for (let i = 1; i < seq[p].length; i++) {
-        if (seq[p][i] === seq[p][i - 1]) {
+      let home = 0;
+      let games = 0;
+      for (let i = 0; i < seq[p].length; i++) {
+        const venue = seq[p][i];
+        // An odd roster leaves gaps where that player had the bye.
+        if (!venue) continue;
+        games++;
+        if (venue === "H") home++;
+        if (i > 0 && venue === seq[p][i - 1]) {
           run++;
           total += run > 2 ? 6 : 1;
         } else {
           run = 1;
         }
       }
+
+      // Mirroring balances a two-legged season by itself, but a single round
+      // robin has to be steered: an odd number of games allows a gap of one.
+      const allowedGap = games % 2;
+      const gap = Math.abs(home - (games - home));
+      if (gap > allowedGap) total += (gap - allowedGap) * 40;
     }
     return total;
   };
 
-  let current = venueCost();
-  for (let pass = 0; pass < 200; pass++) {
-    let improved = false;
-    for (let r = 0; r < rounds; r++) {
-      for (let i = 0; i < flags[r].length; i++) {
-        flags[r][i] = !flags[r][i];
-        const next = venueCost();
-        if (next < current) {
-          current = next;
-          improved = true;
-        } else {
+  // Hill-climbing from one start can stall in a lopsided arrangement, so try a
+  // few starts and keep the best. Seeded from the roster, so the same players
+  // always get the same schedule.
+  let seed = roster.reduce((acc, name) => (acc * 31 + name.length + name.charCodeAt(0)) >>> 0, 7);
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+
+  const climb = (): number => {
+    let cost = venueCost();
+    for (let pass = 0; pass < 200; pass++) {
+      let improved = false;
+      for (let r = 0; r < rounds; r++) {
+        for (let i = 0; i < flags[r].length; i++) {
           flags[r][i] = !flags[r][i];
+          const next = venueCost();
+          if (next < cost) {
+            cost = next;
+            improved = true;
+          } else {
+            flags[r][i] = !flags[r][i];
+          }
+        }
+      }
+      if (!improved) break;
+    }
+    return cost;
+  };
+
+  const venueSpread = (): { imbalance: number; excess: number[] } => {
+    const home = new Array<number>(n).fill(0);
+    const away = new Array<number>(n).fill(0);
+    for (let r = 0; r < rounds; r++) {
+      for (let i = 0; i < halfPairs[r].length; i++) {
+        const [a, b] = halfPairs[r][i];
+        if (roster[a] === BYE || roster[b] === BYE) continue;
+        if (flags[r][i]) {
+          home[a]++;
+          away[b]++;
+        } else {
+          home[b]++;
+          away[a]++;
         }
       }
     }
-    if (!improved) break;
+    const excess = home.map((h, i) => h - away[i]);
+    let imbalance = 0;
+    for (let i = 0; i < n; i++) {
+      if (roster[i] === BYE) continue;
+      const games = home[i] + away[i];
+      imbalance += Math.max(0, Math.abs(excess[i]) - (games % 2));
+    }
+    return { imbalance, excess };
+  };
+
+  /**
+   * Hill-climbing alone leaves some players lopsided in a one-legged season,
+   * and a strictly-improving swap often does not exist — handing a home game
+   * from one over-loaded player to an equal one just moves the problem. So this
+   * walks those equal-cost swaps at random, remembering the best spread it saw.
+   */
+  const repairBalance = () => {
+    if (legs !== 1) return; // two legs balance themselves by mirroring
+
+    let { imbalance } = venueSpread();
+    if (imbalance === 0) return;
+    let bestFlags = flags.map((row) => [...row]);
+    let bestImbalance = imbalance;
+
+    for (let iteration = 0; iteration < 4000 && bestImbalance > 0; iteration++) {
+      const { excess } = venueSpread();
+      const moves: [number, number][] = [];
+      for (let r = 0; r < rounds; r++) {
+        for (let i = 0; i < halfPairs[r].length; i++) {
+          const [a, b] = halfPairs[r][i];
+          if (roster[a] === BYE || roster[b] === BYE) continue;
+          const homeSide = flags[r][i] ? a : b;
+          const awaySide = flags[r][i] ? b : a;
+          if (excess[homeSide] > excess[awaySide]) moves.push([r, i]);
+        }
+      }
+      if (moves.length === 0) break;
+
+      const [r, i] = moves[Math.floor(rand() * moves.length)];
+      flags[r][i] = !flags[r][i];
+
+      imbalance = venueSpread().imbalance;
+      if (imbalance < bestImbalance) {
+        bestImbalance = imbalance;
+        bestFlags = flags.map((row) => [...row]);
+      }
+    }
+
+    for (let r = 0; r < rounds; r++) {
+      for (let i = 0; i < flags[r].length; i++) flags[r][i] = bestFlags[r][i];
+    }
+  };
+
+  let best = flags.map((row) => [...row]);
+  let bestCost = climb();
+  best = flags.map((row) => [...row]);
+
+  for (let restart = 0; restart < 12 && bestCost > 0; restart++) {
+    for (let r = 0; r < rounds; r++) {
+      for (let i = 0; i < flags[r].length; i++) flags[r][i] = rand() < 0.5;
+    }
+    const cost = climb();
+    if (cost < bestCost) {
+      bestCost = cost;
+      best = flags.map((row) => [...row]);
+    }
   }
+
+  for (let r = 0; r < rounds; r++) {
+    for (let i = 0; i < flags[r].length; i++) flags[r][i] = best[r][i];
+  }
+
+  // Even out home and away, then tidy the venue runs that repair may have left.
+  repairBalance();
+  climb();
 
   const fixtures: Match[] = [];
   const pushRound = (matchday: number, round: number, mirrored: boolean) => {
@@ -222,18 +359,24 @@ export function generateFixtures(players: string[]): Match[] {
   };
 
   for (let r = 0; r < rounds; r++) pushRound(r + 1, r, false);
-  for (let r = 0; r < rounds; r++) pushRound(rounds + r + 1, r, true);
+  if (legs === 2) {
+    for (let r = 0; r < rounds; r++) pushRound(rounds + r + 1, r, true);
+  }
 
   return fixtures;
 }
 
 /** Sanity check used by tests and before storing a generated schedule. */
-export function validateFixtures(players: string[], fixtures: Match[]): string[] {
+export function validateFixtures(
+  players: string[],
+  fixtures: Match[],
+  legs: LegCount = DEFAULT_LEGS
+): string[] {
   const errors: string[] = [];
   const n = players.length;
   if (n < MIN_PLAYERS) return ["Not enough players"];
 
-  const expectedPerPlayer = 2 * (n - 1);
+  const expectedPerPlayer = legs * (n - 1);
   const counts = new Map(players.map((p) => [p, { games: 0, home: 0, away: 0 }]));
   const ordered = new Map<string, number>();
   const perMatchday = new Map<number, Set<string>>();
@@ -273,7 +416,13 @@ export function validateFixtures(players: string[], fixtures: Match[]): string[]
   for (const [key, count] of ordered) {
     if (count !== 1) errors.push(`${key.replace("|", " vs ")} appears ${count} times`);
     const [h, a] = key.split("|");
-    if (!ordered.has(`${a}|${h}`)) errors.push(`Missing reverse fixture for ${h} vs ${a}`);
+    const reverse = ordered.has(`${a}|${h}`);
+    if (legs === 2 && !reverse) {
+      errors.push(`Missing reverse fixture for ${h} vs ${a}`);
+    }
+    if (legs === 1 && reverse) {
+      errors.push(`${h} and ${a} meet twice in a one-legged league`);
+    }
   }
 
   return errors;

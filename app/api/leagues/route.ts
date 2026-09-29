@@ -5,6 +5,7 @@ import {
   MIN_PLAYERS,
   emptyLeague,
   generateFixtures,
+  normaliseLegs,
   hasDuplicate,
   normalisePlayerName,
   uniqueSlug,
@@ -28,12 +29,13 @@ export async function POST(request: Request) {
   const body = await readBody(request);
   if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 
-  const { name, adminCode, players, creationCode, relegationCount } = body as {
+  const { name, adminCode, players, creationCode, relegationCount, legs } = body as {
     name?: unknown;
     adminCode?: unknown;
     players?: unknown;
     creationCode?: unknown;
     relegationCount?: unknown;
+    legs?: unknown;
   };
 
   if (!checkCreationCode(creationCode)) {
@@ -76,6 +78,7 @@ export async function POST(request: Request) {
     const existing = (await listLeagues()).map((l) => l.slug);
     const league = emptyLeague(uniqueSlug(leagueName, existing), leagueName, hashCode(adminCode));
     league.players = roster;
+    league.legs = normaliseLegs(legs);
     league.relegationCount =
       typeof relegationCount === "number" && Number.isInteger(relegationCount) && relegationCount >= 0
         ? relegationCount
@@ -83,8 +86,8 @@ export async function POST(request: Request) {
 
     // Generating now is optional: a league can add players first and generate later.
     if (roster.length >= MIN_PLAYERS) {
-      const fixtures = generateFixtures(roster);
-      const errors = validateFixtures(roster, fixtures);
+      const fixtures = generateFixtures(roster, league.legs);
+      const errors = validateFixtures(roster, fixtures, league.legs);
       if (errors.length) {
         return NextResponse.json(
           { error: `Could not build a valid schedule: ${errors[0]}` },

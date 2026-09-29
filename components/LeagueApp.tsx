@@ -173,7 +173,8 @@ export default function LeagueApp({ slug, showDirectoryLink = true }: { slug: st
           </div>
         </div>
         <p className="hero-sub">
-          Season {league.season} · {league.players.length} players
+          Season {league.season} · {league.players.length} players ·{" "}
+          {(league.legs ?? 2) === 1 ? "one leg" : "home & away"}
           {total > 0 && (
             <>
               {" "}

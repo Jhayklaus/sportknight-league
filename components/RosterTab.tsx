@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MAX_PLAYERS, MIN_PLAYERS, type PublicLeague } from "@/lib/leagues";
+import { DEFAULT_LEGS, MAX_PLAYERS, MIN_PLAYERS, type PublicLeague } from "@/lib/leagues";
 
 export function RosterTab({
   league,
@@ -212,6 +212,37 @@ export function RosterTab({
           </p>
         </>
       )}
+
+      <div className="relegation-setting">
+        <h4 className="sub-head">Format</h4>
+        <p className="muted">
+          {locked
+            ? "The format is fixed once results are in."
+            : "Changing this rebuilds the fixture list."}
+        </p>
+        <div className="legs-toggle">
+          {([2, 1] as const).map((option) => {
+            const active = (league.legs ?? DEFAULT_LEGS) === option;
+            return (
+              <button
+                key={option}
+                className={active ? "legs-option active" : "legs-option"}
+                disabled={busy || locked}
+                onClick={() => !active && send({ action: "setLegs", legs: option }, "Format updated.")}
+              >
+                <span className="legs-name">
+                  {option === 2 ? "Home & away" : "One leg"}
+                </span>
+                <span className="legs-meta">
+                  {option === 2 ? "Play everyone twice" : "Play everyone once"}
+                  {league.players.length >= MIN_PLAYERS &&
+                    ` · ${(league.players.length * (league.players.length - 1)) / (option === 2 ? 1 : 2)} matches`}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="relegation-setting">
         <h4 className="sub-head">Relegation</h4>
